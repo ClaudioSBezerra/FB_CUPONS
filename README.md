@@ -105,9 +105,11 @@ Não use o `docker-compose.prod.yml` aqui: o Caddy dele disputaria as portas
 2. Em **Docker Compose Location**, troque para **`/docker-compose.coolify.yml`**.
    O padrão é `/docker-compose.yml`, que é o de desenvolvimento e publica porta
    no host — é o que causa `Bind for 0.0.0.0:8080 failed: port is already allocated`.
-3. Em **Environment Variables**, defina: `POSTGRES_PASSWORD`, `JWT_SECRET`
-   (mín. 32 caracteres), `ADMIN_EMAIL`, `ADMIN_SENHA`, `ANTHROPIC_API_KEY` e
-   `DOMINIO_URL=https://cupom.fbtax.cloud`.
+3. Em **Environment Variables**, defina as obrigatórias — `POSTGRES_PASSWORD`,
+   `JWT_SECRET` (mín. 32 caracteres), `ADMIN_EMAIL` e `ADMIN_SENHA`. O deploy
+   falha sem elas, com a mensagem dizendo qual falta.
+   Opcionais: `ANTHROPIC_API_KEY` (sem ela a importação por PDF fica desativada
+   e o resto funciona) e `DOMINIO_URL=https://cupom.fbtax.cloud`.
 4. Em **Domains**, atribua `cupom.fbtax.cloud` ao serviço **frontend**, porta **80**.
 5. Deploy.
 
@@ -244,6 +246,7 @@ Executado com `docker compose up` e os dois JSONs do legado:
 | Cobrança vs. xlsx de referência | 31 chaves, **idênticas** em qtd, nº de cupons e valor |
 | Excel gerado | subtotais e total exatos; data serial 46311 = 16/10/2026, sem desvio de fuso |
 | Topologia do Coolify (sem porta publicada) | API sobe em `producao`, nginx serve a SPA e repassa `/api` e `/readyz` pela rede interna |
+| Subida sem `ANTHROPIC_API_KEY` | API sobe com aviso; `/me` devolve `leitura_habilitada: false` e `POST /importacoes` responde 503 explicando — sem 500 nem tela quebrada |
 
 Três bugs foram encontrados e corrigidos nesse processo — todos invisíveis sem um
 Postgres de verdade:

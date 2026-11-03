@@ -29,9 +29,13 @@
 #   4. Em Domains, atribua cupom.fbtax.cloud ao serviço "frontend", porta 80
 #   5. Deploy
 #
-# Variáveis a definir no painel:
-#   POSTGRES_PASSWORD   JWT_SECRET (mín. 32 caracteres)   ADMIN_EMAIL
-#   ADMIN_SENHA         ANTHROPIC_API_KEY                 DOMINIO_URL
+# Variáveis obrigatórias no painel (o deploy falha sem elas, com mensagem):
+#   POSTGRES_PASSWORD   JWT_SECRET (mín. 32 caracteres)
+#   ADMIN_EMAIL         ADMIN_SENHA
+#
+# Opcionais:
+#   ANTHROPIC_API_KEY   sem ela a importação por PDF fica desativada
+#   DOMINIO_URL         origem liberada no CORS para clientes externos
 
 services:
   postgres:
@@ -75,7 +79,11 @@ services:
       CORS_ORIGENS: ${DOMINIO_URL:-https://cupom.fbtax.cloud}
       UPLOAD_MAX_MB: ${UPLOAD_MAX_MB:-50}
 
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:?defina ANTHROPIC_API_KEY no painel do Coolify}
+      # Opcional de propósito: sem a chave a API sobe e tudo funciona menos a
+      # importação automática por PDF — cadastros, revisão manual, cobrança e
+      # Excel seguem valendo, e a aba Importar aparece desativada com o motivo.
+      # Preencher depois no painel e redeployar habilita a leitura.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY-}
       CLAUDE_MODEL: ${CLAUDE_MODEL:-claude-opus-5}
       CLAUDE_MODEL_FORTE: ${CLAUDE_MODEL_FORTE:-claude-fable-5}
       CLAUDE_ESFORCO: ${CLAUDE_ESFORCO:-high}
