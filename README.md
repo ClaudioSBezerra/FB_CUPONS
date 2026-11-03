@@ -89,7 +89,7 @@ Há três compose, e a escolha importa:
 | Arquivo | Quando usar |
 |---|---|
 | `docker-compose.yml` | desenvolvimento local |
-| `deploy/docker-compose.coolify.yml` | **Coolify** — nenhum serviço publica porta; quem roteia é o proxy do Coolify |
+| `docker-compose.coolify.yml` | **Coolify** — nenhum serviço publica porta; quem roteia é o proxy do Coolify |
 | `deploy/docker-compose.prod.yml` | VPS com Docker puro — sobe um Caddy próprio nas portas 80/443 |
 
 Nos três, o navegador fala só com o frontend: o nginx dele serve a SPA e repassa
@@ -101,16 +101,24 @@ e sem CORS.
 Não use o `docker-compose.prod.yml` aqui: o Caddy dele disputaria as portas
 80/443 com o proxy do Coolify.
 
-1. **Novo recurso → Docker Compose**, apontando para `deploy/docker-compose.coolify.yml`.
-2. Em **Environment Variables**, defina: `POSTGRES_PASSWORD`, `JWT_SECRET`
+1. **Novo recurso → Docker Compose** (baseado em Git).
+2. Em **Docker Compose Location**, troque para **`/docker-compose.coolify.yml`**.
+   O padrão é `/docker-compose.yml`, que é o de desenvolvimento e publica porta
+   no host — é o que causa `Bind for 0.0.0.0:8080 failed: port is already allocated`.
+3. Em **Environment Variables**, defina: `POSTGRES_PASSWORD`, `JWT_SECRET`
    (mín. 32 caracteres), `ADMIN_EMAIL`, `ADMIN_SENHA`, `ANTHROPIC_API_KEY` e
    `DOMINIO_URL=https://cupom.fbtax.cloud`.
-3. Em **Domains**, atribua `cupom.fbtax.cloud` ao serviço **frontend**, porta **80**.
-4. Deploy.
+4. Em **Domains**, atribua `cupom.fbtax.cloud` ao serviço **frontend**, porta **80**.
+5. Deploy.
 
-> Se aparecer `Bind for 0.0.0.0:8080 failed: port is already allocated`, o compose
-> usado foi o de desenvolvimento, que publica porta no host. Com Coolify nenhum
-> serviço deve publicar porta.
+> **Por que esse arquivo fica na raiz e não em `deploy/`:** o Coolify roda o
+> compose com `--project-directory` na raiz do repositório, e o Docker Compose
+> resolve `build.context` contra o *project directory*, não contra a pasta do
+> arquivo. Em `deploy/`, um `context: ../backend` apontaria para fora do
+> repositório e o build falharia.
+
+> **O admin é criado uma única vez**, na primeira subida com a tabela de usuários
+> vazia. Mudar `ADMIN_SENHA` depois não altera o usuário existente.
 
 ### No VPS com Docker puro
 
@@ -235,6 +243,7 @@ Executado com `docker compose up` e os dois JSONs do legado:
 | Reimportar os mesmos arquivos | 18 ignorados, 0 duplicados |
 | Cobrança vs. xlsx de referência | 31 chaves, **idênticas** em qtd, nº de cupons e valor |
 | Excel gerado | subtotais e total exatos; data serial 46311 = 16/10/2026, sem desvio de fuso |
+| Topologia do Coolify (sem porta publicada) | API sobe em `producao`, nginx serve a SPA e repassa `/api` e `/readyz` pela rede interna |
 
 Três bugs foram encontrados e corrigidos nesse processo — todos invisíveis sem um
 Postgres de verdade:

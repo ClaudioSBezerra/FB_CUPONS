@@ -14,11 +14,20 @@
 #    o Coolify não precisa de roteamento por path e o cookie de sessão fica
 #    first-party.
 #
+# Este arquivo fica na RAIZ do repositório, e não em deploy/, de propósito: o
+# Coolify roda o compose com --project-directory na raiz, e o Docker Compose
+# resolve build.context contra o project directory, não contra a pasta do
+# arquivo. Em deploy/, um "context: ../backend" apontaria para FORA do
+# repositório e o build falharia.
+#
 # No Coolify:
-#   1. Novo recurso → Docker Compose → aponte para deploy/docker-compose.coolify.yml
-#   2. Em Environment Variables, defina os segredos (lista abaixo)
-#   3. Em Domains, atribua cupom.fbtax.cloud ao serviço "frontend", porta 80
-#   4. Deploy
+#   1. Novo recurso → Docker Compose (baseado em Git)
+#   2. Em Docker Compose Location, informe: /docker-compose.coolify.yml
+#      (o padrão é /docker-compose.yml, que é o de DESENVOLVIMENTO e publica
+#      porta no host — foi o que causou "port is already allocated")
+#   3. Em Environment Variables, defina os segredos (lista abaixo)
+#   4. Em Domains, atribua cupom.fbtax.cloud ao serviço "frontend", porta 80
+#   5. Deploy
 #
 # Variáveis a definir no painel:
 #   POSTGRES_PASSWORD   JWT_SECRET (mín. 32 caracteres)   ADMIN_EMAIL
@@ -45,7 +54,7 @@ services:
 
   api:
     build:
-      context: ../backend
+      context: ./backend
     restart: unless-stopped
     depends_on:
       postgres:
@@ -78,7 +87,7 @@ services:
 
   frontend:
     build:
-      context: ../frontend
+      context: ./frontend
       args:
         # Vazio = mesma origem, em /api. O nginx do próprio contêiner repassa.
         VITE_API_URL: ""
