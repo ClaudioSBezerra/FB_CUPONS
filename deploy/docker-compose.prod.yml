@@ -49,7 +49,15 @@ services:
     environment:
       PORTA: 8080
       AMBIENTE: producao
-      DATABASE_URL: postgres://${POSTGRES_USER:-cupons}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-cupons}?sslmode=disable
+      # As partes vão separadas de propósito: a API monta a DSN com
+      # percent-encoding, então senha com espaço, "@", "/" ou "#" funciona.
+      # Colar a senha dentro de uma URL aqui quebrava o deploy.
+      DB_HOST: postgres
+      DB_PORTA: 5432
+      DB_USUARIO: ${POSTGRES_USER:-cupons}
+      DB_SENHA: ${POSTGRES_PASSWORD}
+      DB_NOME: ${POSTGRES_DB:-cupons}
+      DB_SSLMODE: disable
       JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET no .env (mínimo 32 caracteres)}
       SESSAO_HORAS: ${SESSAO_HORAS:-12}
       ADMIN_EMAIL: ${ADMIN_EMAIL:?defina ADMIN_EMAIL no .env}

@@ -247,6 +247,7 @@ Executado com `docker compose up` e os dois JSONs do legado:
 | Excel gerado | subtotais e total exatos; data serial 46311 = 16/10/2026, sem desvio de fuso |
 | Topologia do Coolify (sem porta publicada) | API sobe em `producao`, nginx serve a SPA e repassa `/api` e `/readyz` pela rede interna |
 | Subida sem `ANTHROPIC_API_KEY` | API sobe com aviso; `/me` devolve `leitura_habilitada: false` e `POST /importacoes` responde 503 explicando — sem 500 nem tela quebrada |
+| Senha do banco com espaço, `@`, `/` e `#` | sobe normalmente: a API monta a DSN com percent-encoding a partir das partes |
 
 Três bugs foram encontrados e corrigidos nesse processo — todos invisíveis sem um
 Postgres de verdade:
@@ -261,6 +262,13 @@ Postgres de verdade:
    normal, então **só os cupons com problema eram gravados** — o inverso do desejado.
 3. O nginx do frontend recusaria o upload com 413: o limite padrão de corpo é 1 MB,
    contra os 50 MB de um lote de cupons.
+4. A `DATABASE_URL` era montada colando a senha por interpolação de string no
+   compose, o que quebrava com senha contendo espaço, `@`, `/`, `:`, `?` ou `#` —
+   e o erro só aparecia dentro do driver, longe de onde se configura. Agora o
+   compose passa as partes (`DB_HOST`, `DB_USUARIO`, `DB_SENHA`, `DB_NOME`) e a
+   API monta a DSN com `url.UserPassword`, que faz o escape. Uma `DATABASE_URL`
+   pronta continua tendo precedência, e é validada na subida com mensagem que
+   diz o que fazer.
 
 ## Convenções
 
