@@ -1,0 +1,94 @@
+# Cupons ITD — deploy no Coolify.
+#
+# Use ESTE arquivo no Coolify, não o docker-compose.prod.yml: aquele sobe um
+# Caddy próprio, que disputaria as portas 80/443 com o proxy do Coolify.
+#
+# Diferenças em relação aos outros compose:
+#
+#  * Nenhum serviço publica porta no host. Quem roteia é o proxy do Coolify,
+#    que alcança os contêineres pela rede interna. Publicar porta foi o que
+#    causou o erro "Bind for 0.0.0.0:8080 failed: port is already allocated"
+#    — e, além do conflito, deixaria a API exposta sem HTTPS.
+#
+#  * Só o frontend recebe domínio. O nginx dele repassa /api para a API, então
+#    o Coolify não precisa de roteamento por path e o cookie de sessão fica
+#    first-party.
+#
+# No Coolify:
+#   1. Novo recurso → Docker Compose → aponte para deploy/docker-compose.coolify.yml
+#   2. Em Environment Variables, defina os segredos (lista abaixo)
+#   3. Em Domains, atribua cupom.fbtax.cloud ao serviço "frontend", porta 80
+#   4. Deploy
+#
+# Variáveis a definir no painel:
+#   POSTGRES_PASSWORD   JWT_SECRET (mín. 32 caracteres)   ADMIN_EMAIL
+#   ADMIN_SENHA         ANTHROPIC_API_KEY                 DOMINIO_URL
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-cupons}
+      POSTGRES_USER: ${POSTGRES_USER:-cupons}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no painel do Coolify}
+      POSTGRES_INITDB_ARGS: "--locale=C.UTF-8 --encoding=UTF8"
+      TZ: America/Sao_Paulo
+    volumes:
+      - postgres-dados:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cupons} -d ${POSTGRES_DB:-cupons}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  api:
+    build:
+      context: ../backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PORTA: 8080
+      AMBIENTE: producao
+      DATABASE_URL: postgres://${POSTGRES_USER:-cupons}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-cupons}?sslmode=disable
+      JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET no painel do Coolify}
+      SESSAO_HORAS: ${SESSAO_HORAS:-12}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:?defina ADMIN_EMAIL no painel do Coolify}
+      ADMIN_SENHA: ${ADMIN_SENHA:?defina ADMIN_SENHA no painel do Coolify}
+
+      # O navegador fala só com o frontend, que repassa /api pela rede
+      # interna: a requisição chega à API na mesma origem e o CORS não entra
+      # no caminho. DOMINIO_URL continua aqui para o caso de um cliente
+      # externo (script, celular) precisar de origem liberada.
+      CORS_ORIGENS: ${DOMINIO_URL:-https://cupom.fbtax.cloud}
+      UPLOAD_MAX_MB: ${UPLOAD_MAX_MB:-50}
+
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:?defina ANTHROPIC_API_KEY no painel do Coolify}
+      CLAUDE_MODEL: ${CLAUDE_MODEL:-claude-opus-5}
+      CLAUDE_MODEL_FORTE: ${CLAUDE_MODEL_FORTE:-claude-fable-5}
+      CLAUDE_ESFORCO: ${CLAUDE_ESFORCO:-high}
+      CLAUDE_TIMEOUT_S: ${CLAUDE_TIMEOUT_S:-180}
+      LEITURA_CONCORRENCIA: ${LEITURA_CONCORRENCIA:-3}
+      LEITURA_LADO_MAX: ${LEITURA_LADO_MAX:-1568}
+      LIMITE_LEITURAS_DIA: ${LIMITE_LEITURAS_DIA:-200}
+      PDF_DPI: ${PDF_DPI:-300}
+
+  frontend:
+    build:
+      context: ../frontend
+      args:
+        # Vazio = mesma origem, em /api. O nginx do próprio contêiner repassa.
+        VITE_API_URL: ""
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      # Variável mágica do Coolify: gera e associa o domínio a este serviço,
+      # na porta 80. Também é possível fazer isso pela aba Domains do painel.
+      SERVICE_FQDN_FRONTEND_80: ${DOMINIO_PATH:-/}
+
+volumes:
+  postgres-dados:

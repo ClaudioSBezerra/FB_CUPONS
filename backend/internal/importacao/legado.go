@@ -95,7 +95,14 @@ func (s *Servico) ImportarLegado(ctx context.Context, nomeArquivo string, dados 
 		return ResumoLegado{}, err
 	}
 
-	resumo := ResumoLegado{Arquivo: nomeArquivo, Total: len(arq.Cupons)}
+	// Slices inicializados: nil viraria null no JSON e o frontend (ou um
+	// script) quebraria ao iterar.
+	resumo := ResumoLegado{
+		Arquivo:     nomeArquivo,
+		Total:       len(arq.Cupons),
+		Erros:       []string{},
+		Conferencia: []ConferenciaCliente{},
+	}
 	porCliente := map[string]*ConferenciaCliente{}
 
 	for _, cl := range arq.Cupons {

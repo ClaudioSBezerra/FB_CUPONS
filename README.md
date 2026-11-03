@@ -82,7 +82,37 @@ make testar              # go vet, go test, typecheck e vitest
 Sem `ANTHROPIC_API_KEY` o sistema sobe normalmente — revisão manual, cobrança e Excel
 funcionam; só a importação automática fica indisponível.
 
-## Deploy em cupom.fbtax.cloud
+## Deploy
+
+Há três compose, e a escolha importa:
+
+| Arquivo | Quando usar |
+|---|---|
+| `docker-compose.yml` | desenvolvimento local |
+| `deploy/docker-compose.coolify.yml` | **Coolify** — nenhum serviço publica porta; quem roteia é o proxy do Coolify |
+| `deploy/docker-compose.prod.yml` | VPS com Docker puro — sobe um Caddy próprio nas portas 80/443 |
+
+Nos três, o navegador fala só com o frontend: o nginx dele serve a SPA e repassa
+`/api` para a API pela rede interna. Um caminho só, cookie de sessão first-party
+e sem CORS.
+
+### No Coolify
+
+Não use o `docker-compose.prod.yml` aqui: o Caddy dele disputaria as portas
+80/443 com o proxy do Coolify.
+
+1. **Novo recurso → Docker Compose**, apontando para `deploy/docker-compose.coolify.yml`.
+2. Em **Environment Variables**, defina: `POSTGRES_PASSWORD`, `JWT_SECRET`
+   (mín. 32 caracteres), `ADMIN_EMAIL`, `ADMIN_SENHA`, `ANTHROPIC_API_KEY` e
+   `DOMINIO_URL=https://cupom.fbtax.cloud`.
+3. Em **Domains**, atribua `cupom.fbtax.cloud` ao serviço **frontend**, porta **80**.
+4. Deploy.
+
+> Se aparecer `Bind for 0.0.0.0:8080 failed: port is already allocated`, o compose
+> usado foi o de desenvolvimento, que publica porta no host. Com Coolify nenhum
+> serviço deve publicar porta.
+
+### No VPS com Docker puro
 
 1. **DNS** (antes de subir, para o Let's Encrypt validar):
 
@@ -186,10 +216,39 @@ Decisões conscientes, documentadas no código onde valem:
   cupom 1180221 diz "pão francês integral". Um código, dois produtos — precisa de decisão.
 - **Cupom 1180221**: o JSON traz `total = 0`; o xlsx de referência traz R$ 1.106,50 (a soma
   dos itens). Qual vale na importação?
-- **Testes de integração com Postgres** ainda não escritos: exigem Docker, que não estava
-  disponível na máquina de desenvolvimento. As migrations e as consultas SQL **não foram
-  executadas contra um banco real**.
+- **Teste de integração automatizado** (`go test` contra um Postgres de container) ainda
+  não escrito. O fluxo foi validado manualmente contra banco real — ver abaixo — mas isso
+  não roda em CI.
 - Abas de Admin (usuários e log de custo) existem na API, não na interface.
+
+## Validação contra banco real (2026-11-03)
+
+Executado com `docker compose up` e os dois JSONs do legado:
+
+| Verificação | Resultado |
+|---|---|
+| Migrations 1 e 2 | aplicadas, versão 2, não *dirty* |
+| Seeds | 3 clientes, 22 produtos do catálogo + 3 a confirmar |
+| Maternidade Célia Câmara | 18 cupons, **R$ 7.225,77** |
+| Dona Íris | 12 confirmados **R$ 11.500,46** + 5 pendentes |
+| Total confirmado | **R$ 18.726,23** |
+| Reimportar os mesmos arquivos | 18 ignorados, 0 duplicados |
+| Cobrança vs. xlsx de referência | 31 chaves, **idênticas** em qtd, nº de cupons e valor |
+| Excel gerado | subtotais e total exatos; data serial 46311 = 16/10/2026, sem desvio de fuso |
+
+Três bugs foram encontrados e corrigidos nesse processo — todos invisíveis sem um
+Postgres de verdade:
+
+1. `CREATE INDEX ... date_trunc('month', data)` era recusado com
+   `functions in index expression must be marked IMMUTABLE`: com coluna `date` ou
+   `timestamptz` o Postgres escolhe a variante `timestamptz` de `date_trunc()`, que é
+   `STABLE` por depender do fuso. Os índices passaram a ser sobre as colunas e as
+   consultas filtram competência por intervalo semiaberto — além de voltar a usar índice,
+   o resultado deixou de depender de `TimeZone`.
+2. `incertos` e `avisos` nulos violavam `TEXT[] NOT NULL`. Cupom sem aviso é o caso
+   normal, então **só os cupons com problema eram gravados** — o inverso do desejado.
+3. O nginx do frontend recusaria o upload com 413: o limite padrão de corpo é 1 MB,
+   contra os 50 MB de um lote de cupons.
 
 ## Convenções
 

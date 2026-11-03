@@ -105,7 +105,7 @@ func (s *Store) ListarCupons(ctx context.Context, f Filtro) ([]dominio.Cupom, er
 		cond = append(cond, fmt.Sprintf(expr, len(args)))
 	}
 	if f.Mes != "" {
-		add("date_trunc('month', c.data) = date_trunc('month', $%d::date)", f.Mes+"-01")
+		add(condCompetencia("c.data"), f.Mes+"-01")
 	}
 	if f.ClienteID > 0 {
 		add("c.cliente_id = $%d", f.ClienteID)
@@ -254,6 +254,12 @@ type ResultadoGravacao struct {
 // existente estiver pendente. Se já estiver confirmado, nada é sobrescrito e
 // Ignorado volta true, para a UI mostrar conflito.
 func (s *Store) SalvarCupom(ctx context.Context, c dominio.Cupom, importacaoID *int64) (ResultadoGravacao, error) {
+	// incertos e avisos são TEXT[] NOT NULL no banco: um slice nil viraria
+	// NULL e a inserção falharia. Cupom sem aviso é o caso NORMAL — o que
+	// chega sem nada a sinalizar é justamente o cupom que a leitura acertou.
+	c.Incertos = semNil(c.Incertos)
+	c.Avisos = semNil(c.Avisos)
+
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return ResultadoGravacao{}, err
@@ -357,6 +363,14 @@ func (s *Store) SalvarCupom(ctx context.Context, c dominio.Cupom, importacaoID *
 	return res, tx.Commit(ctx)
 }
 
+// semNil troca um slice nil por um vazio, para as colunas TEXT[] NOT NULL.
+func semNil(xs []string) []string {
+	if xs == nil {
+		return []string{}
+	}
+	return xs
+}
+
 func inserirItens(ctx context.Context, tx pgx.Tx, cupomID int64, itens []dominio.Item) error {
 	for i, it := range itens {
 		ordem := it.Ordem
@@ -367,10 +381,7 @@ func inserirItens(ctx context.Context, tx pgx.Tx, cupomID int64, itens []dominio
 		if un != dominio.UND && un != dominio.KG {
 			un = dominio.UND
 		}
-		incertos := it.Incertos
-		if incertos == nil {
-			incertos = []string{}
-		}
+		incertos := semNil(it.Incertos)
 		_, err := tx.Exec(ctx,
 			`INSERT INTO cupom_itens (cupom_id, ordem, codigo, produto, unidade, qtd, vun, vtot, incertos)
 			 VALUES ($1, $2, $3, $4, $5, $6::numeric, $7::numeric, $8::numeric, $9)`,
@@ -415,7 +426,7 @@ func (s *Store) ContarPorStatus(ctx context.Context, mes string, clienteID int64
 	var args []any
 	if mes != "" {
 		args = append(args, mes+"-01")
-		cond = append(cond, fmt.Sprintf("date_trunc('month', data) = date_trunc('month', $%d::date)", len(args)))
+		cond = append(cond, fmt.Sprintf(condCompetencia("data"), len(args)))
 	}
 	if clienteID > 0 {
 		args = append(args, clienteID)
@@ -462,7 +473,7 @@ func (s *Store) NumerosParecidos(ctx context.Context, numero, cnpjCliente, mes s
 	linhas, err := s.pool.Query(ctx,
 		`SELECT c.id, c.numero, COALESCE(c.data::text, ''), c.cliente_nome, COALESCE(c.cnpj_cliente, '')
 		   FROM cupons c
-		  WHERE date_trunc('month', c.data) = date_trunc('month', $1::date)
+		  WHERE c.data >= $1::date AND c.data < ($1::date + INTERVAL '1 month')
 		    AND c.numero <> ''
 		    AND c.numero <> $2
 		    AND COALESCE(c.cnpj_cliente, '') <> $3

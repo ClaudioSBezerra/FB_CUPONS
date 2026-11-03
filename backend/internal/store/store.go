@@ -132,6 +132,21 @@ func lerValor(s string) (dominio.Valor, error) {
 	return dominio.ParseValor(s)
 }
 
+// condCompetencia devolve o filtro de mês como intervalo semiaberto
+// [primeiro dia, primeiro dia do mês seguinte).
+//
+// A forma óbvia, date_trunc('month', data) = date_trunc('month', $1::date),
+// não serve: numa coluna date ou timestamptz o Postgres escolhe a variante
+// timestamptz de date_trunc(), que é STABLE porque depende do fuso da sessão.
+// Isso impede o índice e torna o resultado dependente de TimeZone — num
+// sistema onde a competência define o que o cliente paga, isso é inaceitável.
+//
+// O template usa $%[1]d duas vezes, então recebe UM único argumento no
+// Sprintf: o número do placeholder.
+func condCompetencia(coluna string) string {
+	return coluna + " >= $%[1]d::date AND " + coluna + " < ($%[1]d::date + INTERVAL '1 month')"
+}
+
 // lerQtd idem para quantidade.
 func lerQtd(s string) (dominio.Qtd, error) {
 	if s == "" {

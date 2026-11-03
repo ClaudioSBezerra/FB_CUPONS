@@ -24,7 +24,9 @@ services:
       - postgres-dados:/var/lib/postgresql/data
     ports:
       # Exposto só no localhost: útil para psql e DBeaver, sem abrir o banco.
-      - "127.0.0.1:5432:5432"
+      # A porta do host é configurável porque muita máquina já tem um Postgres
+      # nativo na 5432; a API não usa esta porta (fala pela rede interna).
+      - "127.0.0.1:${POSTGRES_PORTA:-5432}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cupons} -d ${POSTGRES_DB:-cupons}"]
       interval: 10s
@@ -68,7 +70,9 @@ services:
     build:
       context: ./frontend
       args:
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:8080}
+        # Vazio = mesma origem, em /api: o nginx do contêiner repassa para a
+        # API. Mesmo comportamento da produção.
+        VITE_API_URL: ${VITE_API_URL-}
     restart: unless-stopped
     depends_on:
       - api

@@ -13,28 +13,17 @@
 {$DOMINIO} {
 	encode zstd gzip
 
-	# A API e o frontend vivem no mesmo domínio: o cookie de sessão fica
-	# first-party, sem CORS e sem SameSite=None.
-	handle /api/* {
-		reverse_proxy api:8080 {
-			# Uma página de PDF pode levar minutos na leitura por visão.
-			transport http {
-				read_timeout 15m
-				write_timeout 15m
-			}
+	# Tudo vai para o frontend, cujo nginx serve a SPA e repassa /api, /healthz
+	# e /readyz para a API pela rede interna.
+	#
+	# Um caminho só, igual ao do deploy no Coolify: menos ramo de roteamento
+	# para dar errado, e o cookie de sessão fica first-party sem CORS.
+	reverse_proxy frontend:80 {
+		# Ler um PDF de 20 páginas pela API de visão leva minutos.
+		transport http {
+			read_timeout 15m
+			write_timeout 15m
 		}
-	}
-
-	handle /healthz {
-		reverse_proxy api:8080
-	}
-
-	handle /readyz {
-		reverse_proxy api:8080
-	}
-
-	handle {
-		reverse_proxy frontend:80
 	}
 
 	# Limite de corpo coerente com UPLOAD_MAX_MB da API, para o upload grande

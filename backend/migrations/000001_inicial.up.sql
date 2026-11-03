@@ -104,7 +104,11 @@ CREATE UNIQUE INDEX cupons_numero_cliente_uniq
 CREATE UNIQUE INDEX cupons_legado_uniq ON cupons (legado_id) WHERE legado_id IS NOT NULL;
 
 CREATE INDEX cupons_status ON cupons (status);
-CREATE INDEX cupons_competencia ON cupons (date_trunc('month', data), cliente_id);
+-- Índice sobre as COLUNAS, não sobre date_trunc(): com uma coluna date ou
+-- timestamptz o Postgres resolve date_trunc() para a variante timestamptz,
+-- que é STABLE (depende do fuso da sessão) e não pode entrar em índice. As
+-- consultas filtram competência por intervalo semiaberto, que usa este índice.
+CREATE INDEX cupons_competencia ON cupons (data, cliente_id);
 CREATE INDEX cupons_cliente ON cupons (cliente_id);
 
 CREATE TABLE cupom_itens (
@@ -139,4 +143,4 @@ CREATE TABLE leituras_log (
   criado_em      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX leituras_log_dia ON leituras_log (date_trunc('day', criado_em));
+CREATE INDEX leituras_log_dia ON leituras_log (criado_em);

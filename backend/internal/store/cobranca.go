@@ -60,7 +60,7 @@ func (s *Store) Cobrancar(ctx context.Context, mes string, clienteID int64) (Cob
 	args := []any{mes + "-01"}
 	cond := []string{
 		"c.status = 'confirmado'",
-		"date_trunc('month', c.data) = date_trunc('month', $1::date)",
+		"c.data >= $1::date AND c.data < ($1::date + INTERVAL '1 month')",
 	}
 	if clienteID > 0 {
 		args = append(args, clienteID)
@@ -155,7 +155,7 @@ func (s *Store) contarCuponsConfirmados(ctx context.Context, mes string, cliente
 	err := s.pool.QueryRow(ctx,
 		`SELECT count(*) FROM cupons
 		  WHERE status = 'confirmado'
-		    AND date_trunc('month', data) = date_trunc('month', $1::date)
+		    AND data >= $1::date AND data < ($1::date + INTERVAL '1 month')
 		    AND COALESCE(cliente_id, 0) = $2`,
 		mes+"-01", clienteID).Scan(&n)
 	return n, err
@@ -183,7 +183,7 @@ func (s *Store) ItensDoMes(ctx context.Context, mes string, clienteID int64) ([]
 	args := []any{mes + "-01"}
 	cond := []string{
 		"c.status <> 'rejeitado'",
-		"date_trunc('month', c.data) = date_trunc('month', $1::date)",
+		"c.data >= $1::date AND c.data < ($1::date + INTERVAL '1 month')",
 	}
 	if clienteID > 0 {
 		args = append(args, clienteID)
@@ -248,7 +248,7 @@ func (s *Store) CuponsDoMes(ctx context.Context, mes string, clienteID int64) ([
 	args := []any{mes + "-01"}
 	cond := []string{
 		"c.status <> 'rejeitado'",
-		"date_trunc('month', c.data) = date_trunc('month', $1::date)",
+		"c.data >= $1::date AND c.data < ($1::date + INTERVAL '1 month')",
 	}
 	if clienteID > 0 {
 		args = append(args, clienteID)
