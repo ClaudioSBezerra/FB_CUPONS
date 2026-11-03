@@ -1,0 +1,40 @@
+# Segredos — nunca commitar (ANTHROPIC_API_KEY, DATABASE_URL, JWT_SECRET)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Go
+/backend/bin/
+/backend/tmp/
+*.test
+*.out
+coverage.*
+
+# Node / frontend
+node_modules/
+/frontend/dist/
+/frontend/.vite/
+npm-debug.log*
+yarn-error.log*
+
+# Banco / backups locais
+*.sql.gz
+*.dump
+/deploy/backups/
+
+# Arquivos de trabalho (PDFs e fotos de cupons a processar)
+/uploads/
+/tmp/
+*.pdf
+
+# Sistema operacional / WSL
+*:Zone.Identifier
+.DS_Store
+Thumbs.db
+
+# Editores
+.vscode/
+.idea/
+*.swp

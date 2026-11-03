@@ -1,0 +1,1226 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Controle de Cupons</title>
+<style>
+:root{--bg:#f4f5f7;--card:#fff;--ink:#1d2330;--mut:#667085;--line:#e0e3e9;--pri:#1f5eff;--pri2:#e8efff;--ok:#16794c;--err:#c0262d;--warn:#b26a00}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.4 system-ui,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink)}
+header{background:#101828;color:#fff;padding:14px 24px;display:flex;align-items:center;gap:24px;flex-wrap:wrap}
+header h1{font-size:18px;margin:0;font-weight:600}
+nav{display:flex;gap:6px;flex-wrap:wrap}
+nav button{background:transparent;color:#cdd5e3;border:0;padding:8px 14px;border-radius:8px;font:inherit;cursor:pointer}
+nav button.active{background:#fff;color:#101828;font-weight:600}
+main{max-width:1350px;margin:20px auto;padding:0 16px}
+section{display:none}
+section.active{display:block}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:16px}
+h2{font-size:16px;margin:0 0 14px}
+.mut{color:var(--mut)}
+.grid{display:grid;gap:12px}
+.g4{grid-template-columns:repeat(4,1fr)}
+.g3{grid-template-columns:repeat(3,1fr)}
+@media(max-width:900px){.g4,.g3{grid-template-columns:1fr 1fr}}
+@media(max-width:560px){.g4,.g3{grid-template-columns:1fr}}
+label{display:block;font-size:12px;color:var(--mut);margin-bottom:3px;font-weight:600}
+input,select,textarea{width:100%;padding:8px 10px;border:1px solid #c9cfda;border-radius:8px;font:inherit;background:#fff;color:var(--ink)}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--pri2);border-color:var(--pri)}
+input.incerto,select.incerto{background:#fff3c4;border-color:#d9a400}
+.hint{font-size:12px;margin-top:2px;min-height:15px}
+.ok{color:var(--ok)}.bad{color:var(--err)}.warn{color:var(--warn)}
+button.b{background:var(--pri);color:#fff;border:0;padding:9px 16px;border-radius:8px;font:inherit;font-weight:600;cursor:pointer}
+button.b:disabled{opacity:.5;cursor:default}
+button.b.sec{background:#fff;color:var(--ink);border:1px solid #c9cfda}
+button.b.dng{background:#fff;color:var(--err);border:1px solid #f0c4c6}
+button.b.sm{padding:4px 9px;font-size:13px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.split{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(320px,1fr);gap:16px;align-items:start}
+@media(max-width:1000px){.split{grid-template-columns:1fr}}
+.photocol{position:sticky;top:10px}
+@media(max-width:1000px){.photocol{position:static}}
+.foto-wrap{max-height:calc(100vh - 230px);min-height:120px;overflow:auto;border:1px solid var(--line);border-radius:8px;background:#fafafa;margin-top:8px}
+.foto-wrap img{display:block;width:100%;max-width:none}
+.items-head,.item{display:grid;grid-template-columns:70px 2fr 52px 70px 84px 94px 30px;gap:6px;align-items:start}
+.items-head{font-size:12px;color:var(--mut);font-weight:600;margin-bottom:4px}
+.item{margin-bottom:8px}
+.item input{padding:7px 6px}
+.item button{padding:6px 0}
+@media(max-width:700px){.items-head{display:none}.item{grid-template-columns:1fr 1fr;border:1px solid var(--line);padding:8px;border-radius:8px}}
+.total-box{display:flex;justify-content:flex-end;gap:24px;align-items:center;margin-top:10px;font-size:15px;flex-wrap:wrap}
+.total-box strong{font-size:20px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{background:#f8f9fb;font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:var(--mut);cursor:pointer;user-select:none;white-space:nowrap}
+td.r,th.r{text-align:right}
+td.r{white-space:nowrap;font-variant-numeric:tabular-nums}
+tfoot td{font-weight:700;background:#f8f9fb}
+.scroll{overflow-x:auto}
+.empty{text-align:center;color:var(--mut);padding:30px}
+dialog{border:0;border-radius:12px;padding:12px;max-width:92vw;max-height:92vh}
+dialog img{max-width:85vw;max-height:80vh;display:block}
+dialog::backdrop{background:rgba(0,0,0,.55)}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#101828;color:#fff;padding:10px 18px;border-radius:8px;opacity:0;transition:.25s;pointer-events:none;z-index:9}
+.toast.show{opacity:1}
+.pill{display:inline-block;background:var(--pri2);color:var(--pri);border-radius:99px;padding:1px 9px;font-size:12px;font-weight:600}
+.printtitle{display:none}
+.banner{background:#fff8e1;border:1px solid #f1d98a;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:14px}
+.banner ul{margin:6px 0 0 18px;padding:0}
+.banner details{margin-top:6px}
+.banner pre{white-space:pre-wrap;font-size:12px;background:#fff;border:1px solid var(--line);border-radius:6px;padding:8px;max-height:200px;overflow:auto}
+.bar{height:10px;background:#e6e9f0;border-radius:99px;overflow:hidden;margin:12px 0 6px}
+.bar>div{height:100%;width:0;background:var(--pri);transition:width .2s}
+#imp-log{max-height:260px;overflow:auto;font-size:13px;border:1px solid var(--line);border-radius:8px;padding:8px;background:#fafafa;margin-top:10px}
+#imp-log div{padding:1px 0}
+@media print{
+  header,.noprint,.toast{display:none!important}
+  body{background:#fff}
+  section{display:none!important}
+  section.active{display:block!important}
+  .card{border:0;padding:0}
+  .printtitle{display:block;margin-bottom:8px}
+  th{cursor:default}
+}
+.chip{background:#fff;border:1px solid #c9cfda;border-radius:99px;padding:3px 11px;font:inherit;font-size:13px;cursor:pointer;margin:0 6px 4px 0}
+.chip:hover{background:var(--pri2);border-color:var(--pri)}
+</style>
+</head>
+</head>
+<body>
+<header>
+  <h1>🧾 Controle de Cupons</h1>
+  <nav>
+    <button data-tab="lista" class="active">Cupons</button>
+    <button data-tab="importar">Importar pasta</button>
+    <button data-tab="revisao">Revisão <span class="pill" id="nav-pend" style="display:none">0</span></button>
+    <button data-tab="novo">Novo cupom</button>
+    <button data-tab="cobranca">Cobrança</button>
+    <button data-tab="backup">Backup</button>
+  </nav>
+</header>
+<main>
+
+<section id="lista" class="active">
+  <div class="card">
+    <div class="row" style="justify-content:space-between;margin-bottom:10px">
+      <h2 style="margin:0">Cupons confirmados <span class="pill" id="lista-count">0</span></h2>
+      <button class="b" onclick="novoCupom()">+ Novo cupom</button>
+    </div>
+    <div class="scroll"><table>
+      <thead><tr><th>Data</th><th>Cupom</th><th>Cliente</th><th class="r">Itens</th><th class="r">Total</th><th class="noprint"></th></tr></thead>
+      <tbody id="lista-body"></tbody><tfoot id="lista-foot"></tfoot></table></div>
+  </div>
+</section>
+
+<!-- IMPORTAR -->
+<section id="importar">
+  <div class="card">
+    <h2>Importar cupons de uma pasta</h2>
+    <p class="mut" style="margin-top:0">Escolha a pasta com as imagens escaneadas (PNG ou JPEG) ou um arquivo PDF digitalizado pelo iPhone. O aplicativo separa os cupons de cada folha, lê o texto e preenche o que conseguir. Lê o <b>nº do cupom, data, CNPJ do cliente, total e todos os itens</b>. Depois você confere e completa na aba <b>Revisão</b>, com os campos duvidosos em amarelo. As imagens são processadas no seu computador e não são enviadas a lugar nenhum.</p>
+    <div class="row">
+      <button class="b" id="btn-pasta" onclick="$('#imp-pasta').click()">Escolher pasta…</button>
+      <button class="b sec" id="btn-arqs" onclick="$('#imp-arqs').click()">Escolher arquivos…</button>
+      <input type="file" id="imp-pasta" webkitdirectory multiple hidden>
+      <input type="file" id="imp-arqs" accept="image/*,.pdf,application/pdf" multiple hidden>
+    </div>
+    <label style="display:flex;gap:8px;align-items:center;margin-top:12px;font-size:14px;color:var(--ink);font-weight:400"><input type="checkbox" id="imp-multi" checked style="width:auto"> Cada imagem pode ter vários cupons (separar automaticamente)</label>
+    <div class="row" style="margin-top:10px"><label style="margin:0;font-size:14px;color:var(--ink);font-weight:400">Qualidade da leitura:</label>
+      <select id="imp-qual" style="width:auto"><option value="2">Rápida (2 leituras por cupom)</option><option value="4">Normal (4 leituras, recomendado)</option><option value="6" selected>Máxima (6 leituras, mais lenta)</option></select></div>
+    <div class="banner" style="margin-top:12px"><b>Dicas para fotografar no iPhone</b><ul>
+<li>Um cupom por foto, esticado sobre uma mesa lisa e escura, ocupando bem o quadro.</li>
+<li>Boa luz do dia ou luz branca, sem flash e sem sombra da mão ou do celular.</li>
+<li>Celular paralelo ao papel (de cima), tocando na tela para focar no texto. A orientação não importa, o app endireita.</li>
+<li>Formato JPEG: em Ajustes &gt; Câmera &gt; Formatos, escolha “Mais Compatível”. Fotos HEIC não são lidas pelo navegador.</li>
+<li>Escolha a qualidade “Máxima” aqui embaixo: é mais lenta, mas lê melhor.</li></ul></div>
+    <p class="hint mut">A leitura (OCR) usa a biblioteca Tesseract.js, baixada da internet na primeira vez (cerca de 15 MB com o idioma português). Sem internet, as fotos são importadas mesmo assim e você digita os dados na Revisão.</p>
+    <div class="bar"><div id="imp-bar"></div></div>
+    <div id="imp-status" class="mut">Aguardando…</div>
+    <div id="imp-log" style="display:none"></div>
+  </div>
+</section>
+
+<section id="revisao">
+  <div class="card">
+    <div class="row" style="justify-content:space-between;margin-bottom:10px">
+      <h2 style="margin:0">Cupons para revisar <span class="pill" id="rev-count">0</span></h2>
+      <div class="row">
+        <button class="b" onclick="revisarProximo()">Revisar o primeiro</button>
+        <button class="b dng" onclick="excluirPendentes()">Excluir todos</button>
+      </div>
+    </div>
+    <div class="scroll"><table>
+      <thead><tr><th>Origem</th><th>Cupom</th><th>Data</th><th>CNPJ / Cliente</th><th class="r">Total</th><th class="r">Itens</th><th class="r">Pendências</th><th></th></tr></thead>
+      <tbody id="rev-body"></tbody></table></div>
+  </div>
+</section>
+
+<section id="novo">
+  <div class="split">
+  <div class="formcol">
+    <div id="rev-banner" class="banner" style="display:none"></div>
+    <div class="card">
+      <h2 id="form-title">Novo cupom</h2>
+      <div class="grid g3">
+        <div><label>Nº do cupom *</label><input id="f-num" inputmode="numeric"></div>
+        <div><label>Data *</label><input type="date" id="f-data"></div>
+        <div><label>Valor total do cupom (R$) *</label><input id="f-total" inputmode="decimal" placeholder="0,00"></div>
+        <div><label>CNPJ do cliente *</label><input id="f-cnpjcli" inputmode="numeric" placeholder="00.000.000/0000-00"><div class="hint" id="h-cnpjcli"></div></div>
+        <div style="grid-column:span 2"><label>Nome do cliente</label><input id="f-cli" list="dl-cli"><datalist id="dl-cli"></datalist><div class="hint mut">Preenchido sozinho quando o CNPJ já foi cadastrado antes.</div></div>
+        <div style="grid-column:1/-1"><label>Observações</label><input id="f-obs"></div>
+      </div>
+      <details style="margin-top:12px"><summary class="mut" style="cursor:pointer">Empresa emitente</summary>
+        <div class="grid g3" style="margin-top:8px">
+          <div style="grid-column:span 2"><label>Empresa</label><input id="f-emp" list="dl-emp"><datalist id="dl-emp"></datalist></div>
+          <div><label>CNPJ da empresa</label><input id="f-cnpjemp" inputmode="numeric"><div class="hint" id="h-cnpjemp"></div></div>
+        </div></details>
+    </div>
+    <div class="card">
+      <h2>Itens do cupom</h2>
+      <div class="items-head"><div>Código</div><div>Produto *</div><div>Un.</div><div>Qtde</div><div>Valor unit.</div><div>Total *</div><div></div></div>
+      <div id="itens"></div>
+      <datalist id="dl-prod"></datalist>
+      <button class="b sec sm" onclick="addItem()">+ Adicionar item</button>
+      <div class="total-box"><span>Soma dos itens:</span><strong id="soma">R$ 0,00</strong><span id="conf" class="hint"></span></div>
+    </div>
+    <div class="row" style="margin-bottom:24px">
+      <button class="b" id="btn-salvar" onclick="salvarCupom()">Salvar cupom</button>
+      <button class="b sec" id="btn-pular" style="display:none" onclick="pularPendente()">Pular</button>
+      <button class="b dng" id="btn-excluirpend" style="display:none" onclick="excluirPendente()">Excluir este</button>
+      <button class="b sec" id="btn-limpar" onclick="novoCupom()">Limpar</button>
+      <button class="b sec" onclick="cancelarForm()">Voltar</button>
+    </div>
+  </div>
+  <aside class="photocol">
+    <div class="card">
+      <h2 style="margin-bottom:8px">Foto do cupom</h2>
+      <div class="row">
+        <input type="file" id="f-foto" accept="image/*" style="max-width:240px">
+        <button class="b sec sm" onclick="girarFoto()">↻ Girar 90°</button>
+        <button class="b dng sm" onclick="removerFoto()">Remover</button>
+      </div>
+      <div class="row" style="margin-top:8px"><label style="margin:0">Zoom</label><input type="range" id="f-zoom" min="100" max="400" value="100" step="10" style="flex:1"></div>
+      <div class="foto-wrap" id="foto-wrap"><img id="foto-prev" alt="" style="display:none"></div>
+    </div>
+  </aside>
+  </div>
+</section>
+
+<section id="cobranca">
+  <div class="card">
+    <div class="noprint">
+      <h2>Cobrança do mês</h2>
+      <div class="grid g3" style="margin-bottom:12px">
+        <div><label>Mês</label><select id="c-mes"></select></div>
+        <div><label>Cliente</label><select id="c-cli"></select></div>
+        <div><label>Itens da cobrança</label><select id="c-agr"><option value="prod">Acumulado por produto (todos os itens)</option><option value="um">Um único item acumulado no mês</option></select></div>
+        <div id="c-nome-box" style="display:none"><label>Nome do item acumulado</label><input id="c-nome" placeholder="ex.: Fornecimento de pães e bolos"></div>
+        <div class="row" style="align-items:end">
+          <button class="b" onclick="exportarXLSX()">Baixar Excel</button>
+          <button class="b sec" onclick="exportarCSV()">CSV</button>
+          <button class="b sec" onclick="window.print()">Imprimir / PDF</button>
+        </div>
+      </div>
+    </div>
+    <h2 class="printtitle" id="print-title"></h2>
+    <p class="mut" style="margin-top:0">Soma de todos os itens dos cupons do período, por produto. Cupons incluídos: <b id="c-qtd">0</b>.</p>
+    <div id="c-aviso"></div>
+    <div class="scroll"><table id="c-acum"></table></div>
+    <h2 style="margin-top:22px">Cupons incluídos</h2>
+    <div class="scroll"><table id="c-det"></table></div>
+  </div>
+</section>
+
+<!-- BACKUP -->
+<section id="backup">
+  <div class="card">
+    <h2>Backup dos dados</h2>
+    <p class="mut" style="margin-top:0">Os dados ficam salvos neste navegador, neste notebook. Faça um backup de tempos em tempos e guarde o arquivo em um pen drive ou na nuvem. O backup inclui as fotos dos cupons e os cupons ainda pendentes de revisão.</p>
+    <div class="row">
+      <button class="b" onclick="exportarBackup()">Baixar backup (.json)</button>
+      <input type="file" id="imp" accept=".json" style="max-width:300px">
+      <button class="b sec" onclick="importarBackup()">Importar backup</button>
+    </div>
+    <p class="hint" id="bk-msg"></p>
+    <hr style="border:0;border-top:1px solid var(--line);margin:18px 0">
+    <button class="b dng" onclick="apagarTudo()">Apagar todos os dados</button>
+  </div>
+</section>
+
+</main>
+
+<dialog id="dlg"><img id="dlg-img" alt=""><div style="text-align:right;margin-top:8px"><button class="b sec sm" onclick="document.getElementById('dlg').close()">Fechar</button></div></dialog>
+<div class="toast" id="toast"></div>
+
+<script>
+/*TESTAVEL-INICIO*/
+/* =====================================================================
+   BLOCO PURO (sem acesso à tela): utilitários, imagem em matrizes e leitura do texto do cupom
+   ===================================================================== */
+
+/* Empresas já conhecidas: o aplicativo corrige/preenche o CNPJ e o nome por esta lista.
+   Para incluir outras, copie uma linha e altere. */
+const CONHECIDAS=[
+  {nome:'STRAVAGANZA',cnpj:'29.220.487/0001-08',chaves:['P[A0O]D[A0O]R[IL1]A','C[O0]NFE[IL1T]']},
+  {nome:'ARROZ CRISTAL',cnpj:'02.709.992/0001-56'},
+  {nome:'MATERNIDADE CÉLIA CÂMARA',cnpj:'37.678.845/0007-36'},
+  {nome:'DONA ÍRIS',cnpj:'37.678.845/0003-02'}
+];
+const eConhecida=n=>CONHECIDAS.find(k=>k.nome.toLowerCase()===String(n||'').trim().toLowerCase());
+
+const num=s=>{if(typeof s==='number')return s;s=String(s||'').trim();if(!s)return 0;if(s.includes(','))s=s.replace(/\./g,'').replace(',','.');const v=parseFloat(s);return isNaN(v)?0:v;};
+const r2=n=>Math.round(n*100)/100;
+const onlyD=s=>String(s||'').replace(/\D/g,'');
+function maskCnpj(v){v=onlyD(v).slice(0,14);return v.replace(/^(\d{2})(\d)/,'$1.$2').replace(/^(\d{2})\.(\d{3})(\d)/,'$1.$2.$3').replace(/\.(\d{3})(\d)/,'.$1/$2').replace(/(\d{4})(\d)/,'$1-$2')}
+function validCnpj(c){c=onlyD(c);if(c.length!==14||/^(\d)\1+$/.test(c))return false;
+  const calc=n=>{let s=0,p=n-7;for(let i=0;i<n;i++){s+=c[i]*p--;if(p<2)p=9}const r=s%11;return r<2?0:11-r};
+  return calc(12)==c[12]&&calc(13)==c[13]}
+const semAcento=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'');
+
+/* ---------- imagem em matrizes ---------- */
+function grayFromRGBA(d,w,h){const g=new Uint8Array(w*h);for(let i=0,j=0;i<g.length;i++,j+=4)g[i]=(d[j]*299+d[j+1]*587+d[j+2]*114)/1000|0;return g}
+function medianGray(g){const hist=new Uint32Array(256);for(let i=0;i<g.length;i++)hist[g[i]]++;let c=0;const half=g.length/2;for(let i=0;i<256;i++){c+=hist[i];if(c>=half)return i}return 255}
+function normalizarGray(g){
+  const hist=new Uint32Array(256);for(let i=0;i<g.length;i++)hist[g[i]]++;
+  const n=g.length;let c=0,lo=0,hi=255;
+  for(let i=0;i<256;i++){c+=hist[i];if(c>=n*0.005){lo=i;break}}
+  c=0;for(let i=255;i>=0;i--){c+=hist[i];if(c>=n*0.30){hi=i;break}}
+  if(hi<=lo+10){hi=Math.min(255,lo+60)}
+  const out=new Uint8Array(n),k=255/(hi-lo);
+  for(let i=0;i<n;i++){const v=(g[i]-lo)*k;out[i]=v<0?0:v>255?255:v|0}
+  return out}
+function bradley(g,w,h,win,t){
+  const W=w+1,I=new Float64Array(W*(h+1));
+  for(let y=0;y<h;y++){let row=0;for(let x=0;x<w;x++){row+=g[y*w+x];I[(y+1)*W+x+1]=I[y*W+x+1]+row}}
+  const r=win>>1,out=new Uint8Array(w*h);
+  for(let y=0;y<h;y++){const y0=Math.max(0,y-r),y1=Math.min(h,y+r+1);
+    for(let x=0;x<w;x++){const x0=Math.max(0,x-r),x1=Math.min(w,x+r+1);
+      const s=I[y1*W+x1]-I[y0*W+x1]-I[y1*W+x0]+I[y0*W+x0],cnt=(x1-x0)*(y1-y0);
+      out[y*w+x]=g[y*w+x]*cnt<s*(1-t)?0:255}}
+  return out}
+function dilatar(mask,w,h,r){
+  const tmp=new Uint8Array(w*h),out=new Uint8Array(w*h);
+  const pre=new Int32Array(Math.max(w,h)+1);
+  for(let y=0;y<h;y++){const row=y*w;pre[0]=0;for(let x=0;x<w;x++)pre[x+1]=pre[x]+mask[row+x];
+    for(let x=0;x<w;x++){const a=x-r<0?0:x-r,b=x+r+1>w?w:x+r+1;tmp[row+x]=pre[b]-pre[a]>0?1:0}}
+  for(let x=0;x<w;x++){pre[0]=0;for(let y=0;y<h;y++)pre[y+1]=pre[y]+tmp[y*w+x];
+    for(let y=0;y<h;y++){const a=y-r<0?0:y-r,b=y+r+1>h?h:y+r+1;out[y*w+x]=pre[b]-pre[a]>0?1:0}}
+  return out}
+function componentes(mask,raw,w,h){
+  const seen=new Uint8Array(w*h),boxes=[],stack=new Int32Array(w*h);
+  for(let s=0;s<w*h;s++){if(!mask[s]||seen[s])continue;
+    let sp=0;stack[sp++]=s;seen[s]=1;let x0=w,x1=0,y0=h,y1=0,mass=0;
+    while(sp){const p=stack[--sp],x=p%w,y=(p/w)|0;
+      if(raw[p]){mass++;if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y}
+      if(x>0&&mask[p-1]&&!seen[p-1]){seen[p-1]=1;stack[sp++]=p-1}
+      if(x<w-1&&mask[p+1]&&!seen[p+1]){seen[p+1]=1;stack[sp++]=p+1}
+      if(y>0&&mask[p-w]&&!seen[p-w]){seen[p-w]=1;stack[sp++]=p-w}
+      if(y<h-1&&mask[p+w]&&!seen[p+w]){seen[p+w]=1;stack[sp++]=p+w}}
+    boxes.push({x0,y0,x1,y1,mass})}
+  return boxes}
+/* Acha os cupons numa imagem em tons de cinza (já reduzida). Devolve caixas {x0,y0,x1,y1} em ordem de leitura. */
+function localizarCupons(g,w,h,multi){
+  const bg=medianGray(g),thr=Math.max(120,bg-40);
+  const raw=new Uint8Array(w*h);let total=0;
+  for(let i=0;i<raw.length;i++){if(g[i]<thr){raw[i]=1;total++}}
+  /* descarta pontinhos isolados (poeira do vidro do scanner): traço de texto tem vizinhos escuros, poeira não */
+  {const W=w+1,I=new Int32Array(W*(h+1));
+   for(let y=0;y<h;y++){let row=0;for(let x=0;x<w;x++){row+=raw[y*w+x];I[(y+1)*W+x+1]=I[y*W+x+1]+row}}
+   for(let y=0;y<h;y++){const y0=Math.max(0,y-3),y1=Math.min(h,y+4);
+     for(let x=0;x<w;x++){if(!raw[y*w+x])continue;const x0=Math.max(0,x-3),x1=Math.min(w,x+4);
+       if(I[y1*W+x1]-I[y0*W+x1]-I[y1*W+x0]+I[y0*W+x0]<6){raw[y*w+x]=0;total--}}}}
+  if(total<30)return [];
+  let boxes;
+  if(!multi){
+    const cols=new Int32Array(w),rows=new Int32Array(h);
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++)if(raw[y*w+x]){cols[x]++;rows[y]++}
+    let x0=0,x1=w-1,y0=0,y1=h-1;
+    while(x0<w&&cols[x0]<3)x0++;while(x1>0&&cols[x1]<3)x1--;while(y0<h&&rows[y0]<3)y0++;while(y1>0&&rows[y1]<3)y1--;
+    if(x1<=x0||y1<=y0)return [];
+    boxes=[{x0,y0,x1,y1,mass:total}];
+  }else{
+    const r=Math.max(4,Math.round(Math.max(w,h)*0.017));
+    boxes=componentes(dilatar(raw,w,h,r),raw,w,h).filter(b=>b.mass>=Math.max(80,w*h*0.0012)&&(b.x1-b.x0)>=w*0.04&&(b.y1-b.y0)>=h*0.04);
+  }
+  /* ordem de leitura: linhas de cima para baixo, esquerda para direita */
+  boxes.sort((a,b)=>a.y0-b.y0);
+  const linhas=[];
+  for(const b of boxes){const cy=(b.y0+b.y1)/2;const l=linhas.find(L=>cy>=L.y0&&cy<=L.y1);
+    if(l){l.itens.push(b);l.y0=Math.min(l.y0,b.y0);l.y1=Math.max(l.y1,b.y1)}else linhas.push({y0:b.y0,y1:b.y1,itens:[b]})}
+  const ordem=[];for(const l of linhas){l.itens.sort((a,b)=>a.x0-b.x0);ordem.push(...l.itens)}
+  return ordem}
+
+/* ---------- pré-processamento para OCR (matrizes) ---------- */
+function gaussBlur(g,w,h,sigma){
+  if(!(sigma>0))return g;
+  const r=Math.max(1,Math.ceil(sigma*3)),k=new Float32Array(2*r+1);let s=0;
+  for(let i=-r;i<=r;i++){const v=Math.exp(-i*i/(2*sigma*sigma));k[i+r]=v;s+=v}
+  for(let i=0;i<k.length;i++)k[i]/=s;
+  const tmp=new Float32Array(w*h),out=new Uint8Array(w*h);
+  for(let y=0;y<h;y++){const o=y*w;for(let x=0;x<w;x++){let a=0;for(let i=-r;i<=r;i++){let xx=x+i;xx=xx<0?0:xx>=w?w-1:xx;a+=g[o+xx]*k[i+r]}tmp[o+x]=a}}
+  for(let y=0;y<h;y++){for(let x=0;x<w;x++){let a=0;for(let i=-r;i<=r;i++){let yy=y+i;yy=yy<0?0:yy>=h?h-1:yy;a+=tmp[yy*w+x]*k[i+r]}out[y*w+x]=(a+.5)|0}}
+  return out}
+/* fundo local = média numa janela (2r+1), por imagem integral */
+function fundoLocal(g,w,h,r){
+  const W=w+1,I=new Float64Array(W*(h+1));
+  for(let y=0;y<h;y++){let row=0;for(let x=0;x<w;x++){row+=g[y*w+x];I[(y+1)*W+x+1]=I[y*W+x+1]+row}}
+  const out=new Float32Array(w*h);
+  for(let y=0;y<h;y++){const y0=Math.max(0,y-r),y1=Math.min(h,y+r+1);
+    for(let x=0;x<w;x++){const x0=Math.max(0,x-r),x1=Math.min(w,x+r+1);
+      out[y*w+x]=(I[y1*W+x1]-I[y0*W+x1]-I[y1*W+x0]+I[y0*W+x0])/((x1-x0)*(y1-y0))}}
+  return out}
+/* "mapa de tinta": realça o traço fino e claro da impressora térmica e apaga o fundo, texto escuro em fundo branco */
+function mapaTinta(g,w,h,sigma,gamma){
+  const bg=fundoLocal(g,w,h,Math.max(8,Math.round(w/48)));
+  const d=new Float32Array(w*h),hist=new Uint32Array(256);
+  for(let i=0;i<d.length;i++){let v=bg[i]-g[i];if(v<0)v=0;d[i]=v;hist[v>255?255:v|0]++}
+  let c=0,p=8;const lim=w*h*0.005;
+  for(let i=255;i>=0;i--){c+=hist[i];if(c>=lim){p=Math.max(i,8);break}}
+  const out=new Uint8Array(w*h);
+  for(let i=0;i<out.length;i++){let v=d[i]/p;if(v>1)v=1;out[i]=255-Math.round(255*Math.pow(v,gamma))}
+  return gaussBlur(out,w,h,sigma)}
+/* ângulo (graus, sentido horário do canvas) que deixa as linhas de texto retas */
+function anguloInclinacao(g,w,h){
+  const k=Math.min(1,600/w),sw=Math.max(8,Math.round(w*k)),sh=Math.max(8,Math.round(h*k));
+  const s=new Uint8Array(sw*sh);
+  for(let y=0;y<sh;y++){const yy=Math.min(h-1,Math.floor(y/k));for(let x=0;x<sw;x++)s[y*sw+x]=g[yy*w+Math.min(w-1,Math.floor(x/k))]}
+  const bg=fundoLocal(s,sw,sh,Math.max(6,sw>>5)),xs=[],ys=[];
+  for(let y=0;y<sh;y++)for(let x=0;x<sw;x++)if(bg[y*sw+x]-s[y*sw+x]>18){xs.push(x-sw/2);ys.push(y-sh/2)}
+  if(xs.length<50)return 0;
+  let best=0,bv=-1;const off=Math.ceil(sw*0.08)+2,N=sh+2*off;
+  for(let a=-4;a<=4.001;a+=0.25){
+    const sn=Math.sin(a*Math.PI/180),cs=Math.cos(a*Math.PI/180),cnt=new Float64Array(N);
+    for(let i=0;i<xs.length;i++){const yy=Math.round(ys[i]*cs+xs[i]*sn+sh/2)+off;if(yy>=0&&yy<N)cnt[yy]++}
+    let m=0,m2=0;for(let i=0;i<N;i++){m+=cnt[i];m2+=cnt[i]*cnt[i]}
+    const v=m2/N-(m/N)*(m/N);if(v>bv){bv=v;best=a}}
+  return best}
+
+/* semelhança de produtos: letras/dígitos parecidos viram o mesmo símbolo (O/0, G/6, S/5, B/8, I/L/1, Z/2) */
+const canonProd=s=>semAcento(String(s||'')).toUpperCase().replace(/[^A-Z0-9]/g,'').replace(/[OQ]/g,'0').replace(/G/g,'6').replace(/S/g,'5').replace(/B/g,'8').replace(/[IL]/g,'1').replace(/Z/g,'2');
+function similaridade(a,b){
+  if(!a.length||!b.length)return 0;
+  let prev=Array.from({length:b.length+1},(_,j)=>j);
+  for(let i=1;i<=a.length;i++){const cur=[i];
+    for(let j=1;j<=b.length;j++)cur[j]=Math.min(prev[j]+1,cur[j-1]+1,prev[j-1]+(a[i-1]===b[j-1]?0:1));
+    prev=cur}
+  return 1-prev[b.length]/Math.max(a.length,b.length)}
+function melhorProduto(desc,nomes){
+  if(!nomes||!nomes.length)return null;
+  const d=canonProd(desc);if(d.length<4)return null;
+  let best=null,bs=0;
+  for(const n of nomes){const sc=similaridade(d,canonProd(n.prod));if(sc>bs){bs=sc;best=n}}
+  return bs>=0.55?best:null}
+
+/* ---------- leitura do texto do cupom ---------- */
+function digitosConfusos(t){
+  const um=t=>t.replace(/(?<=[\d.\/\-])[DU](?=[\d.\/\-])/g,'0').replace(/(?<=[\d.\/\-])G(?=[\d.\/\-])/g,'6').replace(/(?<=\d)T(?=\d)/g,'7');
+  return um(um(digitosConfusos1(t)))}
+function digitosConfusos1(t){
+  return t.replace(/(?<=\d)[OQ](?=[\d.,\/\-])|(?<=[\d.,\/\-])[OQ](?=\d)/g,'0')
+          .replace(/(?<=\d)[Il|](?=[\d.,\/\-])|(?<=[\d.,\/\-])[Il|](?=\d)/g,'1')
+          .replace(/(?<=\d)S(?=\d)/g,'5').replace(/(?<=\d)B(?=\d)/g,'8').replace(/(?<=\d)Z(?=\d)/g,'2')}
+const hamm=(a,b)=>{let n=0;for(let i=0;i<a.length;i++)if(a[i]!==b[i])n++;return n};
+
+function pontuarTexto(texto){
+  const T=semAcento(texto).toUpperCase();
+  let s=0;for(const k of ['CNPJ','TOTAL','VALOR','ITENS','PADARIA','CLIENTE','ASSINATURA','FANTASIA','ENDERECO','CIDADE','UND','EMISSAO','CONFEITARIA'])if(T.includes(k))s++;
+  const N=digitosConfusos(T);
+  for(const m of N.matchAll(/\d[\d.\/\-]{10,19}\d/g)){const d=m[0].replace(/\D/g,'');if(d.length>=13&&d.length<=14)s+=2}
+  if(/\d{2}[\/.\-]\d{2}[\/.\-]20\d{2}/.test(N))s++;
+  return s}
+
+function parseCupom(texto,conhecidas,prodMap){
+  conhecidas=conhecidas||CONHECIDAS;prodMap=prodMap||{};
+  const inc=new Set(),avisos=[];
+  const T=semAcento(String(texto||'')).toUpperCase();
+  const N=digitosConfusos(T);
+  const linhas=N.split(/\r?\n/).map(s=>s.replace(/\s+/g,' ').trim()).filter(Boolean);
+  const out={data:'',num:'',emp:'',cnpjEmp:'',telEmp:'',cli:'',cnpjCli:'',cidCli:'',totalCupom:0,itens:[]};
+  const limpo=s=>String(s||'').replace(/[^A-Z0-9 &.,\-\/]/g,' ').replace(/\s+/g,' ').trim();
+
+  /* --- CNPJs --- */
+  const kn=conhecidas.map(k=>({nome:k.nome,cnpj:k.cnpj,d:onlyD(k.cnpj)}));
+  const achar=d=>{if(d.length!==14)return null;let b=null,emp=false;for(const k of kn){const h=hamm(d,k.d);if(h<=3){if(!b||h<b.h){b={k,h};emp=false}else if(h===b.h)emp=true}}return emp?null:b};
+  const cands=[];
+  for(const m of N.matchAll(/\d[\d.\/\- ]{10,40}\d/g)){
+    let off=0;
+    for(const ch of m[0].split(/\s{2,}/)){
+      const pos=m.index+m[0].indexOf(ch,off);off=m[0].indexOf(ch,off)+ch.length;
+      const orig=ch.replace(/\D/g,'');if(orig.length<12||orig.length>14)continue;
+      let d=orig,curto=false;
+      if(orig.length<14){const z=orig.padStart(14,'0');if(validCnpj(z)||achar(z)){d=z}else curto=true}
+      cands.push({d,pos,curto,k:achar(d)})}}
+  cands.sort((a,b)=>a.pos-b.pos);
+  out.cnpjCand=cands.map(c=>({d:c.d,pos:c.pos}));
+  out.cnpjsValidos=[...new Set(cands.filter(c=>c.d.length===14&&validCnpj(c.d)).map(c=>c.d))];
+  /* o CNPJ do emitente vem antes do corpo do cupom; o do cliente, depois dos totais */
+  const off3=N.split(/\r?\n/).slice(0,3).join('\n').length;   /* o cabeçalho (nome, telefone, CNPJ) fica nas primeiras linhas */
+  const sep0=N.slice(off3).search(/CONVENIO|CHAVE|ITEM\s*COD|CODIG|CLIENTE|TOTAL\s*DE|VALOR\s*A|PAGAR|EMISS/);
+  const sep=sep0<0?-1:sep0+off3;
+  let ce=null,cc=null;out.cnpjSep=sep;
+  if(sep>=0){ce=cands.find(c=>c.pos<sep)||null;cc=cands.find(c=>c.pos>=sep&&(!ce||c.d!==ce.d))||null}
+  else{ce=cands[0]||null;cc=cands.find((c,i)=>i>0&&c.d!==ce.d)||null}
+  if(!cc)cc=cands.find(c=>c!==ce&&c.d.length===14&&validCnpj(c.d)&&(!ce||c.d!==ce.d))||null;
+  const atribuir=(c,campo)=>{
+    if(!c){inc.add(campo);return}
+    if(c.k){out[campo]=c.k.k.cnpj;
+      if(c.k.h>0){inc.add(campo);avisos.push(`${campo==='cnpjEmp'?'CNPJ da empresa':'CNPJ do cliente'}: li ${maskCnpj(c.d)} e ajustei para o CNPJ cadastrado ${c.k.k.cnpj}. Confira.`)}}
+    else{out[campo]=maskCnpj(c.d);if(!validCnpj(c.d)||c.curto)inc.add(campo)}};
+  atribuir(ce,'cnpjEmp');atribuir(cc,'cnpjCli');
+
+  /* --- nomes --- */
+  const topo=linhas.slice(0,6).join(' ');
+  const kEmp=conhecidas.find(k=>(k.chaves||[]).some(c=>new RegExp(c).test(topo)));
+  if(ce&&ce.k){out.emp=ce.k.k.nome}
+  else if(kEmp){out.emp=kEmp.nome;out.cnpjEmp=kEmp.cnpj;inc.delete('cnpjEmp')}
+  else{const l=linhas.find(x=>/PADARIA|CONFEIT|LTDA|EIRELI|COMERCIO|\bME\b/.test(x))||linhas[0]||'';out.emp=limpo(l);inc.add('emp')}
+  const pegar=re=>{for(const l of linhas){const m=l.match(re);if(m&&m[1]&&m[1].trim())return m[1].trim()}return ''};
+  const nome=limpo(pegar(/\bNOME\s*[:.;]*\s*(.+)$/)),fant=limpo(pegar(/\bFANTAS\w*\s*[:.;]*\s*(.+)$/));
+  if(cc&&cc.k){out.cli=cc.k.k.nome}
+  else{out.cli=fant||nome;inc.add('cli')}
+  out.cidCli=limpo(pegar(/\bCIDADE\s*[.:;]*\s*(.+)$/));
+  {const ie=linhas.findIndex(l=>/EMISS/.test(l));
+   let ic=-1;linhas.forEach((l,i)=>{if(i>ie&&/CNP/.test(l))ic=i});
+   if(ic>=0){
+     const sem=l=>limpo(/[:;]/.test(l)?l.replace(/^[^:;]*[:;.]+\s*/,''):l.replace(/^\S+\s+/,''));
+     if(!out.cli&&!(cc&&cc.k)){const f2=linhas[ic+2]?sem(linhas[ic+2]):'',n2=linhas[ic+1]?sem(linhas[ic+1]):'';out.cli=f2||n2}
+     if(!out.cidCli&&linhas[ic+4])out.cidCli=sem(linhas[ic+4])}}
+  const tel=N.split(/\r?\n/).slice(0,5).join(' ').match(/\(\s?\d{2}\s?\)\s?\d{4,5}\s?[-.,]?\s?\d{4}/);
+  if(tel)out.telEmp=tel[0].trim();
+
+  /* --- data --- */
+  const datas=[];
+  for(const m of N.matchAll(/(\d{2})[\/.\-](\d{2})[\/.\-](\d{4})/g)){
+    const d=+m[1],mo=+m[2],y=+m[3];
+    if(d>=1&&d<=31&&mo>=1&&mo<=12&&y>=2000&&y<=2100)datas.push({iso:`${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`,pos:m.index})}
+  if(datas.length){
+    const emi=N.indexOf('EMISS');const dep=emi>=0?datas.find(x=>x.pos>emi):null;
+    out.data=(dep||datas[0]).iso;
+    if(new Set(datas.map(x=>x.iso)).size>1){inc.add('data');avisos.push('Li datas diferentes no cupom ('+[...new Set(datas.map(x=>x.iso.split('-').reverse().join('/')))].join(', ')+'). Confira a data.')}
+    const ano=+out.data.slice(0,4),ag=new Date().getFullYear();
+    if(ano<ag-3||ano>ag+1)inc.add('data')
+  }else inc.add('data');
+
+  /* --- número do cupom --- */
+  const mn=N.match(/(?:CHAVE|CHAVA|CHAV\w|CUPOM|PEDIDO|VENDA|NUMERO|NRO|N[O°º])\s*[:.;,\-]?\s*(\d{6,8})/);
+  if(mn)out.num=mn[1];
+  else{
+    const id=linhas.findIndex(l=>/\d{2}[\/.\-]\d{2}[\/.\-]\d{4}/.test(l));
+    const m1=id>0?linhas[id-1].match(/(?<![\d,.\/])(\d{6,8})(?![\d,.\/])/):null;
+    if(m1)out.num=m1[1];
+    inc.add('num')}
+
+  /* --- total a pagar --- */
+  const dinheiro=l=>{const ms=[...l.matchAll(/(\d{1,3}(?:\.\d{3})+|\d+)[,.]\s?(\d{2})(?!\d)/g)];if(!ms.length)return 0;const m=ms[ms.length-1];return num(m[1].replace(/\./g,'')+','+m[2])};
+  for(const l of linhas){
+    if(/VALOR|PAGAR|PAGA\b|PABA|VAL\w{0,2}\s?A\s?(PA|FR|PR)/.test(l)){const v=dinheiro(l);if(v){out.totalCupom=v;break}}}
+  if(!out.totalCupom){
+    const i=linhas.findIndex(l=>/ITEN|ITEMS/.test(l)&&/TOTAL|FOTAL|TOT|OTD|QTD|GID|GTD/.test(l));
+    if(i>=0)for(const l of linhas.slice(i,i+3)){const v=dinheiro(l);if(v){out.totalCupom=v;break}}}
+  if(!out.totalCupom)inc.add('totalCupom');
+
+  /* --- itens --- */
+  let ini=linhas.findIndex(l=>/IT[EF]\w?\s*C[O0]D|^ITEM\b|CODIG|C[O0]DTA/.test(l));
+  if(ini<0)ini=linhas.findIndex(l=>/CLIENTE|CONVENIO/.test(l));
+  let fim=linhas.findIndex((l,i)=>i>ini&&/TOTAL\s*DE\s*IT|QTD\.?\s*TOTAL|OTD|VALOR\s*A\s*PA|[GQO][TI]?D\.?\s*[TF]OT|[TF]OT[AÁ]L\s*D[EA]\s*I|ITEN/.test(l));
+  if(fim<0)fim=linhas.length;
+  const trecho=linhas.slice(ini+1,fim);
+  /* linha de valores "[qtde] [UN] x unitário total". Só vale se total = qtde × unitário
+     (ou, com a quantidade ilegível, se total ÷ unitário der número inteiro): é a validação contra erro de leitura */
+  const reVal=/(\d+[.,]\d{2,3})[^\d,.]{0,8}(\d[\d.]*[.,]\d{2})[^\d]{0,4}$/;
+  const achaValores=l=>{
+    const m=l.match(reVal);if(!m)return null;
+    const vun=num(m[1]),vtot=num(m[2]);if(!(vun>0&&vtot>0))return null;
+    const pre=l.slice(0,m.index);
+    const mq=pre.match(/(?:(\d+(?:[.,]\d{1,3})?)\s*)?([A-Z]{1,4})?\.?\s*[A-Z%*×4]?\s*$/);
+    const qlido=mq&&mq[1]?num(mq[1]):0;
+    const k=vtot/vun,kInt=Math.abs(k-Math.round(k))<0.001&&Math.round(k)>=1;
+    let qtd,vunF=vun,vtotF=vtot,qflag=false,vflag=false,tflag=false;
+    const kr=Math.round(k);
+    if(qlido>0&&Math.abs(qlido*vun-vtot)<0.011)qtd=qlido;
+    else if(kInt){qtd=kr;qflag=true}
+    else if(kr>=1&&Math.abs(kr*vun-vtot)<=0.15){qtd=kr;vtotF=r2(kr*vun);qflag=!(qlido>0&&qlido===kr);tflag=true}  /* dígito dos centavos mal lido */
+    else if(qlido>0){const vc=r2(vtot/qlido);if(vc>0&&Math.abs(vc*qlido-vtot)<0.011){qtd=qlido;vunF=vc;vflag=true}else return null}
+    else return null;
+    const un=mq&&mq[2]?(/^U/.test(mq[2])?'UND':mq[2]):'';
+    return {index:mq&&mq.index!=null?mq.index:m.index,qtd,vun:vunF,vtot:vtotF,un,qflag,vflag,tflag}};
+  const reHead=/^[^A-Z0-9]*([0OQ][0-9OQDUIL|]{2})\s+([0-9A-Z]{3,8})\b(.*)$/;
+  const hdr=/\b(ITEM|CODIGO|CODIG|DESCRICAO|DESCRI|QTDE|QTD|VLR|UNIT|TOT)\b/;
+  const novo=()=>({cod:'',prod:'',desc:'',un:'',qtd:0,vun:0,vtot:0,inc:[],_q:false});
+  const txt=s=>limpo(s).split(' ').filter(t=>/[A-Z]{2,}/.test(t)).join(' ');
+  const itens=[];let cur=null;
+  for(const l of trecho){
+    const v=achaValores(l),mB=l.match(reHead);
+    if(mB&&!(v&&/^(UND|UNO|UNI|UN|KG|PC|CX|PCT)$/.test(mB[2]))){
+      cur=novo();itens.push(cur);
+      if((mB[2].match(/\d/g)||[]).length>=3)cur.cod=mB[2];
+      const a2=l.indexOf(mB[2],l.indexOf(mB[1])+mB[1].length)+mB[2].length;
+      cur.desc=txt(l.slice(a2,v?v.index:l.length))}
+    else if(v){
+      if(!cur||cur._q){cur=novo();itens.push(cur)}
+      const pre=txt(l.slice(0,v.index));if(pre&&!cur.desc)cur.desc=pre}
+    else if(cur&&!cur._q&&!cur.desc&&!hdr.test(l)){const t=txt(l);if(t)cur.desc=t}
+    if(v&&cur&&v.qflag)cur.desc=cur.desc.replace(/(\s+[A-Z]{1,2})+$/,'');
+    if(v&&cur){cur._q=true;cur.qtd=v.qtd;cur.un=v.un;cur.vun=v.vun;cur.vtot=v.vtot;if(v.qflag)cur.inc.push('qtd');if(v.vflag)cur.inc.push('vun');if(v.tflag)cur.inc.push('vtot');cur._noq=v.qflag}
+  }
+  /* o cupom informa quantos itens tem ("QTD. TOTAL DE ITENS 3") */
+  const lf=linhas[fim]||'';
+  const mN=/TOTAL|OTD|ITEN|GID|QID/.test(lf)?lf.match(/(\d{1,2})\s*\W*$/):null;
+  const nItens=mN?+mN[1]:0;
+  const lidos=itens.length;
+  out.pareamentoIncerto=false;
+  if(nItens>0&&nItens<=40&&lidos!==nItens){
+    avisos.push(`O cupom informa ${nItens} item(ns) e eu li ${lidos}. Confira cada item (produto, quantidade e valores) na foto.`);
+    out.pareamentoIncerto=true;
+    while(itens.length<nItens)itens.push(novo());}
+  /* um único item sem valor: o valor dele é o total do cupom menos os outros */
+  {const falt=itens.filter(i=>!(i.vtot>0));
+   if(out.totalCupom>0&&falt.length===1){
+     const resto=r2(out.totalCupom-itens.reduce((a,i)=>a+(i.vtot>0?i.vtot:0),0));
+     if(resto>0){falt[0].vtot=resto;falt[0].inc.push('vtot')}}}
+  if(!itens.length&&out.totalCupom){const it=novo();it.vtot=out.totalCupom;itens.push(it);avisos.push('Não consegui ler a linha do item. O total do cupom foi colocado em um item para você completar.')}
+
+  for(const it of itens){
+    const marca=f=>{if(!it.inc.includes(f))it.inc.push(f)};
+    if(out.pareamentoIncerto)['prod','qtd','vun','vtot'].forEach(marca);
+    /* produto já conhecido pelo código (aprendido dos cupons confirmados) */
+    let ap=it.cod&&prodMap[it.cod];
+    if(it.cod&&!ap){
+      /* código lido com 1 dígito errado: usa o único código conhecido a 1 edição de distância */
+      const cands=Object.keys(prodMap).filter(k=>/^\d+$/.test(k)&&Math.abs(k.length-it.cod.length)<=1&&similaridade(k,it.cod)>=1-1/Math.max(k.length,it.cod.length)-1e-9);
+      if(cands.length===1){ap=prodMap[cands[0]];it.cod=cands[0];marca('cod');marca('prod')}
+      else marca('cod')}
+    if(ap){it.prod=ap.prod||it.desc;it.desc=ap.desc||'';if(!it.un)it.un=ap.un||'';}
+    else{
+      const g=it.desc?melhorProduto(it.desc,prodMap.__nomes):null;
+      if(g){it.prod=g.prod;it.desc=g.desc||'';if(!it.un)it.un=g.un||'';if(!it.cod)it.cod=g.cod||'';marca('prod')}
+      else{it.prod=it.desc;it.desc='';marca('prod')}}
+    if(!it.prod)marca('prod');
+    /* coerência qtde × unitário = total */
+    if(itens.length===1&&out.totalCupom>0&&Math.abs(it.vtot-out.totalCupom)>0.009){it.vtot=out.totalCupom;marca('vtot')}
+    if(it.vtot<=0&&it.qtd>0&&it.vun>0){it.vtot=r2(it.qtd*it.vun);marca('vtot')}
+    if(it.vtot>0&&Math.abs(it.qtd*it.vun-it.vtot)>0.011){
+      const vunC=it.qtd>0?r2(it.vtot/it.qtd):0,qtdC=it.vun>0?r2(it.vtot/it.vun):0;
+      const okVun=vunC>0&&Math.abs(vunC*it.qtd-it.vtot)<0.011;
+      const okQtd=qtdC>0&&Math.abs(qtdC-Math.round(qtdC))<0.001&&Math.abs(Math.round(qtdC)*it.vun-it.vtot)<0.011;
+      if(Number.isInteger(it.qtd)&&it.qtd>=2&&okVun){it.vun=vunC;marca('vun')}
+      else if(okQtd){it.qtd=Math.round(qtdC);marca('qtd')}
+      else if(okVun){it.vun=vunC;marca('vun')}
+      else{marca('qtd');marca('vun');marca('vtot')}}
+    if(!it.qtd)marca('qtd');
+    if(!it.vun)marca('vun');
+    delete it._q}
+  out.itens=itens;
+  {const okIt=i=>i.vtot>0&&i.qtd>0&&i.vun>0&&Math.abs(i.qtd*i.vun-i.vtot)<0.011&&!i.inc.includes('vtot');
+   const s2=r2(itens.reduce((a,i)=>a+i.vtot,0));
+   if(out.totalCupom>0&&!(itens.some(okIt)&&Math.abs(s2-out.totalCupom)<0.01))inc.add('totalCupom')}
+  if(out.totalCupom>0){const soma=r2(itens.reduce((a,i)=>a+i.vtot,0));
+    if(Math.abs(soma-out.totalCupom)>0.009){inc.add('totalCupom');avisos.push(`A soma dos itens (${soma.toFixed(2).replace('.',',')}) difere do total lido (${out.totalCupom.toFixed(2).replace('.',',')}).`)}}
+  out.inc=[...inc];out.avisos=avisos;
+  return out}
+
+/* ---------- CNPJ com dígito errado: reconstrói pelo dígito verificador a partir de várias leituras ---------- */
+function consensoCnpj(leituras){
+  const reads=[...new Set(leituras.filter(d=>/^\d{14}$/.test(d)))].slice(0,5);
+  if(!reads.length)return null;
+  const v=reads.find(validCnpj);if(v)return v;
+  const sc=new Map(),H=(a,b)=>{let n=0;for(let i=0;i<14;i++)if(a[i]!==b[i])n++;return n};
+  const dig='0123456789';
+  const tenta=c=>{if(sc.has(c)||!validCnpj(c))return;let t=0;for(const r of reads)t+=H(c,r);sc.set(c,t)};
+  for(const r of reads){
+    for(let i=0;i<14;i++)for(const x of dig){if(x===r[i])continue;const a=r.slice(0,i)+x+r.slice(i+1);tenta(a);
+      for(let j=i+1;j<14;j++)for(const y of dig){if(y===r[j])continue;tenta(a.slice(0,j)+y+a.slice(j+1))}}}
+  const l=[...sc].sort((a,b)=>a[1]-b[1]);
+  if(!l.length)return null;
+  if(l.length>1&&l[1][1]===l[0][1])return null;           /* empate: não chuta */
+  if(l[0][1]>reads.length*2)return null;                  /* longe demais das leituras */
+  return l[0][0]}
+
+/* ---------- várias leituras do mesmo cupom → uma só, por validação ---------- */
+function consistenciaParse(p){
+  let s=0;
+  if(validCnpj(p.cnpjEmp))s+=3;if(validCnpj(p.cnpjCli))s+=3;
+  if(p.data)s+=2;if(/^\d{6,8}$/.test(p.num||''))s+=2;
+  const soma=r2(p.itens.reduce((a,i)=>a+i.vtot,0));
+  if(p.totalCupom>0&&Math.abs(soma-p.totalCupom)<0.01)s+=5;
+  for(const i of p.itens){if(i.vtot>0&&i.qtd>0&&Math.abs(i.qtd*i.vun-i.vtot)<0.011)s+=1;if(i.cod)s+=0.5}
+  return s-(p.avisos||[]).length*0.5}
+function mesclarParses(ps){
+  ps=(ps||[]).filter(Boolean);if(ps.length<2)return ps[0];
+  const rank=ps.map(p=>({p,s:consistenciaParse(p)})).sort((a,b)=>b.s-a.s);
+  const base=JSON.parse(JSON.stringify(rank[0].p));
+  const inc=new Set(base.inc||[]);
+  const votar=(campo,ok)=>{const m=new Map();for(const {p} of rank){const v=p[campo];if(!v||(ok&&!ok(v)))continue;m.set(v,(m.get(v)||0)+1)}
+    let v=null,n=0;for(const [k,c] of m)if(c>n){v=k;n=c}return {v,n}};
+  /* CNPJ: qualquer leitura com dígito verificador válido vale */
+  for(const f of ['cnpjEmp','cnpjCli']){
+    if(validCnpj(base[f]))continue;
+    const r=votar(f,validCnpj);
+    if(r.v){base[f]=r.v;inc.delete(f)}}
+  /* emitente e cliente cadastrados */
+  for(const [f,flag] of [['emp','emp'],['cli','cli']]){
+    if(!eConhecida(base[f])){const r=votar(f,eConhecida);if(r.v){base[f]=r.v;inc.delete(flag)}}}
+  /* data e número: maioria entre as leituras */
+  const rd=votar('data',d=>{const y=+d.slice(0,4);return y>=2024&&y<=2035});
+  if(rd.v){base.data=rd.v;if(rd.n>=2)inc.delete('data');else inc.add('data')}
+  const rn=votar('num',n=>/^\d{6,8}$/.test(n));
+  if(rn.v){base.num=rn.v;if(rn.n>=2)inc.delete('num');else inc.add('num')}
+  /* total: o que bate com a soma dos itens; senão a maioria */
+  const soma=r2(base.itens.reduce((a,i)=>a+i.vtot,0));
+  const totais=rank.map(x=>x.p.totalCupom).filter(Boolean);
+  const bate=totais.find(t=>Math.abs(t-soma)<0.01&&soma>0);
+  if(bate){base.totalCupom=bate}
+  else{const rt=votar('totalCupom');if(rt.v)base.totalCupom=rt.v}
+  /* CNPJ já corrigido pela lista cadastrada, mas lido exatamente igual em outra leitura: confirmado */
+  for(const f of ['cnpjEmp','cnpjCli']){
+    if(validCnpj(base[f])&&ps.some(p=>(p.cnpjsValidos||[]).includes(onlyD(base[f])))){
+      inc.delete(f);
+      base.avisos=(base.avisos||[]).filter(a=>!a.startsWith(f==='cnpjEmp'?'CNPJ da empresa':'CNPJ do cliente'))}}
+  /* CNPJ do cliente ainda inválido: reconstrói pelo dígito verificador (sempre fica em amarelo) */
+  if(!validCnpj(base.cnpjCli)){
+    const reads=[];for(const p of ps){const sp=p.cnpjSep;for(const c of (p.cnpjCand||[])){const antes=sp>=0?c.pos<sp:c===p.cnpjCand[0];if(!antes&&c.d.length===14)reads.push(c.d)}}
+    const g=consensoCnpj(reads);
+    if(g){base.cnpjCli=maskCnpj(g);inc.add('cnpjCli');
+      base.avisos=(base.avisos||[]).filter(a=>!a.startsWith('CNPJ do cliente'));
+      base.avisos.push(`CNPJ do cliente: reconstruí ${maskCnpj(g)} pelo dígito verificador, a partir de ${reads.length} leitura(s) com erro. Confira com a foto.`)}}
+  /* itens: um valor (qtde, unitário, total) só é confirmado quando 2 leituras concordam */
+  const okI=i=>i.vtot>0&&i.qtd>0&&i.vun>0&&Math.abs(i.qtd*i.vun-i.vtot)<0.011;
+  const chave=i=>i.qtd+'|'+i.vun+'|'+i.vtot;
+  const votos=new Map();
+  for(const {p} of rank){const vistos=new Set(p.itens.filter(okI).map(chave));for(const k of vistos)votos.set(k,(votos.get(k)||0)+1)}
+  if(rank.length>=2){
+    const usados=new Set(base.itens.filter(i=>okI(i)&&votos.get(chave(i))>=2).map(chave));
+    const livres=[...votos].filter(([k,n])=>n>=2&&!usados.has(k)).sort((a,b)=>b[1]-a[1]).map(([k])=>k);
+    for(const it of base.itens){
+      const conf=okI(it)&&votos.get(chave(it))>=2;
+      if(conf){if(!base.pareamentoIncerto)it.inc=(it.inc||[]).filter(f=>!['qtd','vun','vtot'].includes(f));continue}
+      const k=livres.shift();
+      if(k){const [q,u,t]=k.split('|').map(Number);it.qtd=q;it.vun=u;it.vtot=t}
+      it.inc=[...new Set([...(it.inc||[]),'qtd','vun','vtot'])]}
+    /* um único item sem valor: o total do cupom menos os outros */
+    const falt=base.itens.filter(i=>!(i.vtot>0));
+    if(base.totalCupom>0&&falt.length===1){const resto=r2(base.totalCupom-base.itens.reduce((a,i)=>a+(i.vtot>0?i.vtot:0),0));if(resto>0){falt[0].vtot=resto;falt[0].inc=[...new Set([...(falt[0].inc||[]),'vtot','qtd','vun'])]}}}
+  for(const {p} of rank.slice(1)){if(p.itens.length!==base.itens.length)continue;
+    base.itens.forEach((it,i)=>{const o=p.itens[i];if(!it.prod&&o.prod)it.prod=o.prod;if(!it.cod&&o.cod)it.cod=o.cod})}
+  {const soma2=r2(base.itens.reduce((a,i)=>a+i.vtot,0));
+   base.avisos=(base.avisos||[]).filter(a=>!a.startsWith('A soma dos itens'));
+   if(base.totalCupom>0&&Math.abs(soma2-base.totalCupom)>0.009){inc.add('totalCupom');base.avisos.push(`A soma dos itens (${soma2.toFixed(2).replace('.',',')}) difere do total lido (${base.totalCupom.toFixed(2).replace('.',',')}).`)}
+   else if(base.totalCupom>0&&base.itens.some(i=>okI(i)&&!(i.inc||[]).includes('vtot')))inc.delete('totalCupom')
+   else if(base.totalCupom>0)inc.add('totalCupom')}
+  /* campos que só uma leitura pegou */
+  for(const f of ['cidCli','telEmp']){if(!base[f]){const o=rank.map(x=>x.p[f]).find(Boolean);if(o)base[f]=o}}
+  inc.add('num');   /* 3/5, 0/9 etc. se confundem na fonte térmica, mesmo todas as leituras concordando */
+  base.inc=[...inc];base.consist=rank[0].s;
+  return base}
+/*TESTAVEL-FIM*/
+
+/* =====================================================================
+   BLOCO DE TELA
+   ===================================================================== */
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const brl=n=>(n||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const dBR=iso=>iso?iso.split('-').reverse().join('/'):'';
+const hoje=()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,10)};
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const espera=()=>new Promise(r=>setTimeout(r,0));
+const cmpNat=(a,b)=>String(a).localeCompare(String(b),'pt-BR',{numeric:true});
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500)}
+const mesDe=iso=>iso?iso.slice(0,7):'';
+const mesBR=m=>m?m.split('-').reverse().join('/'):'';
+const itensDe=c=>(c.itens&&c.itens.length)?c.itens:[{cod:'',prod:c.prod||'',un:'',qtd:1,vun:c.total||0,vtot:c.total||0}];
+const prodDe=c=>[...new Set(itensDe(c).map(i=>i.prod).filter(Boolean))].join(' / ');
+const somaItens=c=>r2(itensDe(c).reduce((a,i)=>a+(i.vtot||0),0));
+/* catálogo dos produtos deste fornecedor: o código impresso no cupom identifica o produto */
+const CATALOGO=[['20771','PÃO FRANCÊS 50G','UND',1],['22121','PÃO DOCE 50G','UND',1.5],['2755','ROSCAS 80G','UND',3.3],['1594','ROSCAS 80G DIET/INTEGRAL','UND',4],['1645','ROSCAS 50G','UND',3],['3629','BOLOS 90G','UND',4.15],['941','BROA 80G','UND',3.3],['210','SALGADINHOS VARIADOS 30G','UND',1.1],['836','PÃO DE QUEIJO CONGELADO','KG',29.99],['673','BISCOITO DE QUEIJO CONGELADO KG','KG',29.99],['213','BOLO DE CENOURA','KG',35.99],['3636','PÃO DE FORMA 500G','UND',9.99],['2431','PÃO DE QUEIJO 80G','UND',3.3],['383','BISCOITO DE QUEIJO 80G','UND',3.3],['1207','AMERICANO DE FRANGO 100G','UND',5],['232','AMERICANO DE FRANGO DIET/INTEGRAL 100G','UND',5.5],['2045','ENROLADINHO DE QUEIJO 100G','UND',5],['1485','ENROLADINHO DE QUEIJO DIET/INTEGRAL 100G','UND',5.5],['2077','PETIT GATEAU','UND',9.9],['1534','PÃO FRANCÊS 25G','UND',0.5],['288','PÃO DE QUEIJO','KG',45.99],['110','ENROLADINHO DE QUEIJO KG','KG',45.99]];
+let PROD_POR_COD={};
+const PROD_MAP=()=>{const m={...PROD_POR_COD};const v=new Map();
+  for(const [cod,prod,un] of CATALOGO)v.set(canonProd(prod),{prod,desc:'',un,cod});
+  for(const c of cupons)for(const i of itensDe(c))if(i.prod){const k=canonProd(i.prod);if(!v.has(k))v.set(k,{prod:i.prod,desc:'',un:i.un,cod:i.cod})}
+  m.__nomes=[...v.values()];return m};
+
+/* ---------- CNPJ (campos) ---------- */
+function bindCnpj(inp,hint){
+  const upd=()=>{inp.value=maskCnpj(inp.value);const d=onlyD(inp.value);const h=$(hint);
+    if(d.length<14){h.textContent='';return}
+    h.innerHTML=validCnpj(d)?'<span class="ok">✓ CNPJ válido</span>':'<span class="bad">✗ CNPJ inválido, confira os dígitos</span>'};
+  inp.addEventListener('input',upd);return upd}
+const updCnpjEmp=bindCnpj($('#f-cnpjemp'),'#h-cnpjemp');
+const updCnpjCli=bindCnpj($('#f-cnpjcli'),'#h-cnpjcli');
+
+/* ---------- IndexedDB ---------- */
+let DB;
+function openDB(){return new Promise((ok,ko)=>{const r=indexedDB.open('cupons-db',1);
+  r.onupgradeneeded=()=>r.result.createObjectStore('cupons',{keyPath:'id'});
+  r.onsuccess=()=>{DB=r.result;ok()};r.onerror=()=>ko(r.error)})}
+const tx=(m)=>DB.transaction('cupons',m).objectStore('cupons');
+const dbAll=()=>new Promise((ok,ko)=>{const r=tx('readonly').getAll();r.onsuccess=()=>ok(r.result);r.onerror=()=>ko(r.error)});
+const dbPut=o=>new Promise((ok,ko)=>{const r=tx('readwrite').put(o);r.onsuccess=()=>ok();r.onerror=()=>ko(r.error)});
+const dbDel=id=>new Promise((ok,ko)=>{const r=tx('readwrite').delete(id);r.onsuccess=()=>ok();r.onerror=()=>ko(r.error)});
+const dbClear=()=>new Promise((ok,ko)=>{const r=tx('readwrite').clear();r.onsuccess=()=>ok();r.onerror=()=>ko(r.error)});
+
+let cupons=[],pendentes=[],CLI_POR_CNPJ={},PRODUTOS=[];
+async function carregar(){
+  const todos=await dbAll();
+  cupons=todos.filter(c=>c.status!=='pendente').sort((a,b)=>(b.data||'').localeCompare(a.data||'')||cmpNat(b.num||'',a.num||''));
+  pendentes=todos.filter(c=>c.status==='pendente').sort((a,b)=>cmpNat(a.fonte||'',b.fonte||''));
+  /* nome do cliente aprendido pelo CNPJ (os próximos cupons do mesmo cliente já vêm com o nome) */
+  CLI_POR_CNPJ={};
+  for(const k of CONHECIDAS)CLI_POR_CNPJ[onlyD(k.cnpj)]=k.nome;
+  for(const c of [...cupons].sort((a,b)=>(a.data||'').localeCompare(b.data||'')))if(c.cnpjCli&&c.cli&&validCnpj(c.cnpjCli))CLI_POR_CNPJ[onlyD(c.cnpjCli)]=c.cli;
+  PROD_POR_COD={};
+  for(const [cod,prod,un,vun] of CATALOGO)PROD_POR_COD[cod]={prod,desc:'',un,vun};
+  for(const c of [...cupons].sort((a,b)=>(a.data||'').localeCompare(b.data||'')))for(const i of itensDe(c))if(i.cod&&i.prod)PROD_POR_COD[i.cod]={prod:i.prod,desc:'',un:i.un,vun:i.vun};
+  const cont=new Map();for(const c of cupons)for(const i of itensDe(c))if(i.prod)cont.set(i.prod,(cont.get(i.prod)||0)+1);
+  for(const x of CATALOGO)if(!cont.has(x[1]))cont.set(x[1],0);
+  PRODUTOS=[...cont].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0],'pt-BR')).map(([p])=>p);
+  renderTudo()}
+
+/* ---------- navegação ---------- */
+function show(id){$$('section').forEach(s=>s.classList.toggle('active',s.id===id));$$('nav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===id));
+  if(id==='cobranca')renderCobranca();window.scrollTo(0,0)}
+$$('nav button').forEach(b=>b.onclick=()=>{if(b.dataset.tab==='novo'&&!editId)novoCupom();else show(b.dataset.tab)});
+
+/* ---------- formulário do cupom ---------- */
+let editId=null,foto=null,revMode=false;
+const CAMPOS={data:'#f-data',num:'#f-num',total:'#f-total',cnpjCli:'#f-cnpjcli',cli:'#f-cli',emp:'#f-emp',cnpjEmp:'#f-cnpjemp'};
+document.addEventListener('input',e=>{if(e.target.classList)e.target.classList.remove('incerto')});
+
+/* ---------- itens do cupom ---------- */
+function addItem(it={}){
+  const d=document.createElement('div');d.className='item';
+  const nv=v=>v?String(v).replace('.',','):'';
+  d.innerHTML=`<input class="i-cod" inputmode="numeric" value="${esc(it.cod||'')}">
+  <input class="i-prod" list="dl-prod" value="${esc(it.prod||it.desc||'')}">
+  <input class="i-un" value="${esc(it.un||'')}">
+  <input class="i-qtd" inputmode="decimal" value="${nv(it.qtd)}">
+  <input class="i-vun" inputmode="decimal" value="${nv(it.vun)}">
+  <input class="i-vtot" inputmode="decimal" value="${nv(it.vtot)}">
+  <button class="b dng sm" title="Remover item" tabindex="-1">✕</button>`;
+  const q=d.querySelector('.i-qtd'),u=d.querySelector('.i-vun'),t=d.querySelector('.i-vtot'),c=d.querySelector('.i-cod');
+  const auto=()=>{const a=num(q.value),b=num(u.value);if(a&&b)t.value=r2(a*b).toFixed(2).replace('.',',');somar()};
+  q.oninput=auto;u.oninput=auto;t.oninput=somar;
+  c.onchange=()=>{const p=PROD_POR_COD[c.value.trim()];if(!p)return;
+    const pr=d.querySelector('.i-prod');if(!pr.value){pr.value=p.prod||'';pr.classList.remove('incerto')}
+    const un=d.querySelector('.i-un');if(!un.value)un.value=p.un||'';
+    if(!u.value&&p.vun){u.value=String(p.vun).replace('.',',');auto()}};
+  d.querySelector('button').onclick=()=>{d.remove();somar()};
+  $('#itens').appendChild(d);somar();return d}
+function somar(){
+  const s=r2($$('#itens .i-vtot').reduce((a,i)=>a+num(i.value),0));
+  $('#soma').textContent=brl(s);
+  const tc=num($('#f-total').value),c=$('#conf');
+  if(!tc){c.innerHTML='';return s}
+  const diff=r2(s-tc);
+  c.innerHTML=Math.abs(diff)<0.01?'<span class="ok">✓ itens conferem com o total do cupom</span>':`<span class="bad">Itens ${diff>0?'passam':'faltam'} ${brl(Math.abs(diff))} em relação ao total do cupom</span>`;
+  return s}
+$('#f-total').addEventListener('input',somar);
+$('#f-cnpjcli').addEventListener('input',()=>{const n=CLI_POR_CNPJ[onlyD($('#f-cnpjcli').value)];if(n&&!$('#f-cli').value.trim())$('#f-cli').value=n});
+
+function modoForm(rev){
+  revMode=rev;
+  $('#btn-pular').style.display=rev?'':'none';
+  $('#btn-excluirpend').style.display=rev?'':'none';
+  $('#btn-limpar').style.display=rev?'none':'';
+  $('#btn-salvar').textContent=rev?'Confirmar e ir para o próximo':'Salvar cupom';
+  if(!rev)$('#rev-banner').style.display='none'}
+function preencherForm(c){
+  $('#f-data').value=c.data||'';$('#f-num').value=c.num||'';
+  $('#f-total').value=c.total?String(c.total).replace('.',','):'';
+  $('#f-cnpjcli').value=c.cnpjCli||'';$('#f-cli').value=c.cli||'';$('#f-obs').value=c.obs||'';
+  $('#itens').innerHTML='';(c.itens&&c.itens.length?c.itens:[{}]).forEach(addItem);
+  $('#f-emp').value=c.emp||CONHECIDAS[0].nome;$('#f-cnpjemp').value=c.cnpjEmp||CONHECIDAS[0].cnpj;
+  $('#f-foto').value='';$('#f-zoom').value=100;
+  updCnpjEmp();updCnpjCli();fotoPrev();somar()}
+function novoCupom(){
+  editId=null;foto=null;modoForm(false);
+  $('#form-title').textContent='Novo cupom';
+  preencherForm({data:hoje()});$$('.incerto').forEach(e=>e.classList.remove('incerto'));
+  show('novo')}
+function aplicarMarcas(c){
+  $$('.incerto').forEach(e=>e.classList.remove('incerto'));
+  if(!c||c.status!=='pendente')return;
+  for(const k of (c.inc||[]))if(CAMPOS[k])$(CAMPOS[k]).classList.add('incerto');
+  for(const k of ['data','num','total','cnpjCli'])if(!$(CAMPOS[k]).value.trim())$(CAMPOS[k]).classList.add('incerto');
+  $$('#itens .item').forEach((d,i)=>{const it=(c.itens||[])[i]||{};
+    (it.inc||[]).forEach(f=>{const e=d.querySelector('.i-'+f);if(e)e.classList.add('incerto')});
+    for(const f of ['prod','qtd','vun','vtot']){const e=d.querySelector('.i-'+f);if(e&&!e.value.trim())e.classList.add('incerto')}})}
+function editarCupom(id){
+  const c=cupons.find(x=>x.id===id)||pendentes.find(x=>x.id===id);if(!c)return;
+  editId=id;foto=c.foto||null;
+  const rev=c.status==='pendente';modoForm(rev);
+  $('#form-title').textContent=rev?'Revisar cupom':'Editar cupom';
+  preencherForm(c);aplicarMarcas(c);
+  const b=$('#rev-banner');
+  if(rev){
+    const pos=pendentes.findIndex(x=>x.id===id)+1;
+    b.innerHTML=`<b>Revisão ${pos} de ${pendentes.length}</b> · origem: ${esc(c.fonte||'')}<br>Confira com a foto os campos em <span style="background:#fff3c4;padding:0 4px;border:1px solid #d9a400;border-radius:4px">amarelo</span> e confira <b>cada item</b> do cupom (produto, quantidade e valores).`
+      +((c.avisos||[]).length?`<ul>${c.avisos.map(a=>`<li>${esc(a)}</li>`).join('')}</ul>`:'')
+      +(c.ocr?`<details><summary>Ver o texto lido pelo OCR</summary><pre>${esc(c.ocr)}</pre></details>`:'');
+    b.style.display=''}
+  show('novo');
+  if(rev)setTimeout(()=>{const e=$('#f-num');if(e)e.focus()},50)}
+function cancelarForm(){const veio=revMode;editId=null;modoForm(false);show(veio?'revisao':'lista')}
+
+function lerItens(){return $$('#itens .item').map(d=>({
+  cod:d.querySelector('.i-cod').value.trim(),prod:d.querySelector('.i-prod').value.trim(),desc:'',un:d.querySelector('.i-un').value.trim(),
+  qtd:num(d.querySelector('.i-qtd').value),vun:num(d.querySelector('.i-vun').value),
+  vtot:r2(num(d.querySelector('.i-vtot').value))})).filter(i=>i.prod||i.vtot)}
+async function salvarCupom(){
+  const f={data:$('#f-data').value,num:$('#f-num').value.trim(),total:r2(num($('#f-total').value)),cnpjCli:$('#f-cnpjcli').value,
+    cli:$('#f-cli').value.trim(),obs:$('#f-obs').value.trim(),emp:$('#f-emp').value.trim(),cnpjEmp:$('#f-cnpjemp').value};
+  if(!f.data){alert('Informe a data.');return}
+  if(!f.num){alert('Informe o número do cupom.');$('#f-num').focus();return}
+  if(!(f.total>0)){alert('Informe o valor total do cupom.');$('#f-total').focus();return}
+  if(!f.cnpjCli){alert('Informe o CNPJ do cliente.');$('#f-cnpjcli').focus();return}
+  const itens=lerItens();
+  if(!itens.length){alert('Adicione pelo menos um item do cupom.');return}
+  if(itens.some(i=>!i.prod)){alert('Todo item precisa ter o nome do produto.');return}
+  for(const [k,r] of [['cnpjCli','do cliente'],['cnpjEmp','da empresa']]){const v=f[k];if(v&&!validCnpj(v)&&!confirm(`O CNPJ ${r} (${v}) parece inválido. Salvar mesmo assim?`))return}
+  const soma=r2(itens.reduce((a,i)=>a+i.vtot,0));
+  if(Math.abs(soma-f.total)>=0.01&&!confirm(`A soma dos itens (${brl(soma)}) difere do total do cupom (${brl(f.total)}). Salvar mesmo assim?`))return;
+  const dup=[...cupons,...pendentes].find(c=>c.id!==editId&&c.num&&c.num===f.num&&onlyD(c.cnpjCli)===onlyD(f.cnpjCli)&&Math.abs((c.total||0)-f.total)<0.01);
+  if(dup&&!confirm(`Já existe o cupom nº ${f.num} deste cliente com o mesmo valor. Salvar mesmo assim?`))return;
+  if(!f.cli){const n=CLI_POR_CNPJ[onlyD(f.cnpjCli)];if(n)f.cli=n}
+  const antigo=cupons.find(x=>x.id===editId)||pendentes.find(x=>x.id===editId)||{};
+  const c={id:editId||uid(),...f,itens,foto:foto||null,fonte:antigo.fonte||'',atualizado:new Date().toISOString()};
+  const eraRev=revMode,idAtual=c.id,ordemAntes=pendentes.map(p=>p.id);
+  await dbPut(c);editId=null;await carregar();
+  if(eraRev){
+    const prox=ordemAntes.slice(ordemAntes.indexOf(idAtual)+1).map(id=>pendentes.find(p=>p.id===id)).find(Boolean)||pendentes[0];
+    toast('Cupom confirmado ✓');
+    if(prox)editarCupom(prox.id);else{modoForm(false);show('cobranca')}
+  }else{modoForm(false);show('lista');toast('Cupom salvo ✓')}}
+async function excluirCupom(id){
+  const c=cupons.find(x=>x.id===id);
+  if(!confirm(`Excluir o cupom nº ${c.num} de ${dBR(c.data)} (${brl(c.total)})?`))return;
+  await dbDel(id);await carregar();toast('Cupom excluído')}
+
+/* ---------- revisão (fila de pendentes) ---------- */
+function pendencias(p){return new Set(p.inc||[]).size+(p.itens||[]).filter(i=>(i.inc||[]).length||!i.prod).length}
+function renderRevisao(){
+  $('#rev-count').textContent=pendentes.length;
+  const n=$('#nav-pend');n.textContent=pendentes.length;n.style.display=pendentes.length?'':'none';
+  const b=$('#rev-body');
+  if(!pendentes.length){b.innerHTML='<tr><td colspan="8" class="empty">Nada para revisar. Use “Importar pasta” para carregar cupons.</td></tr>';return}
+  b.innerHTML=pendentes.map(p=>`<tr><td>${esc(p.fonte)}</td><td>${esc(p.num)||'—'}</td><td>${dBR(p.data)||'—'}</td>
+    <td>${esc(p.cnpjCli)||'—'}<div class="hint" style="color:var(--mut)">${esc(p.cli)}</div></td>
+    <td class="r">${p.total?brl(p.total):'—'}</td><td class="r">${(p.itens||[]).length}</td><td class="r">${pendencias(p)}</td>
+    <td class="r"><button class="b sm" onclick="editarCupom('${p.id}')">Revisar</button></td></tr>`).join('')}
+function revisarProximo(){if(!pendentes.length){toast('Nada para revisar');return}editarCupom(pendentes[0].id)}
+function pularPendente(){
+  const i=pendentes.findIndex(p=>p.id===editId),prox=pendentes[i+1];
+  if(prox)editarCupom(prox.id);else{editId=null;modoForm(false);show('revisao')}}
+async function excluirPendente(){
+  if(!confirm('Excluir este cupom pendente? A leitura será descartada.'))return;
+  const i=pendentes.findIndex(p=>p.id===editId);
+  await dbDel(editId);editId=null;await carregar();
+  const prox=pendentes[i]||pendentes[0];
+  if(prox)editarCupom(prox.id);else{modoForm(false);show('revisao')}}
+async function excluirPendentes(){
+  if(!pendentes.length)return;
+  if(!confirm(`Excluir os ${pendentes.length} cupons pendentes? Os já confirmados não são afetados.`))return;
+  for(const p of pendentes)await dbDel(p.id);
+  await carregar();toast('Pendentes excluídos')}
+
+/* ---------- foto ---------- */
+function fotoPrev(){const i=$('#foto-prev');if(foto){i.src=foto;i.style.display='block'}else{i.removeAttribute('src');i.style.display='none'}
+  i.style.width=$('#f-zoom').value+'%'}
+$('#f-zoom').addEventListener('input',()=>{$('#foto-prev').style.width=$('#f-zoom').value+'%'});
+$('#f-foto').addEventListener('change',e=>{
+  const f=e.target.files[0];if(!f)return;
+  const url=URL.createObjectURL(f),img=new Image();
+  img.onload=()=>{const M=1800,k=Math.min(1,M/Math.max(img.width,img.height));
+    const cv=document.createElement('canvas');cv.width=Math.round(img.width*k);cv.height=Math.round(img.height*k);
+    cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);
+    foto=cv.toDataURL('image/jpeg',.85);URL.revokeObjectURL(url);fotoPrev()};
+  img.src=url});
+function girarFoto(){
+  if(!foto)return;const img=new Image();
+  img.onload=()=>{const cv=document.createElement('canvas');cv.width=img.height;cv.height=img.width;
+    const g=cv.getContext('2d');g.translate(cv.width/2,cv.height/2);g.rotate(Math.PI/2);g.drawImage(img,-img.width/2,-img.height/2);
+    foto=cv.toDataURL('image/jpeg',.85);fotoPrev()};
+  img.src=foto}
+function removerFoto(){foto=null;$('#f-foto').value='';fotoPrev()}
+function verFoto(id){const c=cupons.find(x=>x.id===id);if(!c||!c.foto)return;$('#dlg-img').src=c.foto;$('#dlg').showModal()}
+
+
+
+
+/* ---------- lista de cupons ---------- */
+function renderLista(){
+  $('#lista-count').textContent=cupons.length;
+  const b=$('#lista-body');
+  if(!cupons.length){b.innerHTML='<tr><td colspan="6" class="empty">Nenhum cupom confirmado ainda. Use “Importar pasta” ou “Novo cupom”.</td></tr>';$('#lista-foot').innerHTML='';return}
+  b.innerHTML=cupons.map(c=>`<tr>
+    <td>${dBR(c.data)}</td><td>${esc(c.num)}</td>
+    <td>${esc(c.cli)}<div class="hint" style="color:var(--mut)">${esc(c.cnpjCli)}</div></td>
+    <td class="r">${itensDe(c).length}</td><td class="r">${brl(c.total)}</td>
+    <td class="noprint r"><div class="row" style="justify-content:flex-end;flex-wrap:nowrap">
+      ${c.foto?`<button class="b sec sm" onclick="verFoto('${c.id}')">Foto</button>`:''}
+      <button class="b sec sm" onclick="editarCupom('${c.id}')">Editar</button>
+      <button class="b dng sm" onclick="excluirCupom('${c.id}')">Excluir</button></div></td></tr>`).join('');
+  $('#lista-foot').innerHTML=`<tr><td colspan="4">Total geral</td><td class="r">${brl(r2(cupons.reduce((a,c)=>a+c.total,0)))}</td><td></td></tr>`}
+
+/* ---------- cobrança do mês ---------- */
+function cobrancaFiltrada(){
+  const mes=$('#c-mes').value,cl=$('#c-cli').value;
+  return cupons.filter(c=>(!mes||mesDe(c.data)===mes)&&(!cl||(onlyD(c.cnpjCli)||c.cli)===cl))
+    .sort((a,b)=>(a.data||'').localeCompare(b.data||'')||cmpNat(a.num||'',b.num||''))}
+/* acumulado do mês: soma dos itens de todos os cupons, por cliente e produto (ou um único item) */
+function agruparCobranca(ls){
+  const m=new Map(),um=$('#c-agr').value==='um';
+  let nomeUm=($('#c-nome').value||'').trim();
+  if(um&&!nomeUm)nomeUm='Fornecimento do mês';
+  for(const c of ls){
+    const ids=new Set();
+    for(const it of itensDe(c)){
+      const prod=um?nomeUm:(it.prod||'(sem produto)'),un=um?'':(it.un||''),k=[mesDe(c.data),onlyD(c.cnpjCli)||c.cli,prod.toUpperCase(),un].join('|');
+      if(!m.has(k))m.set(k,{mes:mesDe(c.data),cli:c.cli,cnpj:c.cnpjCli,prod,un,qtd:0,n:0,total:0});
+      const g=m.get(k);g.qtd=r2(g.qtd+(it.qtd||0));g.total=r2(g.total+(it.vtot||0));if(!ids.has(k)){ids.add(k);g.n++}}}
+  return [...m.values()].sort((a,b)=>a.mes.localeCompare(b.mes)||(a.cli||'').localeCompare(b.cli||'','pt-BR')||b.total-a.total)}
+const fq=n=>n?String(n).replace('.',','):'';
+function renderCobranca(){
+  const ls=cobrancaFiltrada(),ac=agruparCobranca(ls),um=$('#c-agr').value==='um';
+  const mes=$('#c-mes').value,cl=$('#c-cli'),clTxt=cl.value?cl.options[cl.selectedIndex].textContent:'';
+  $('#print-title').textContent=`Cobrança — ${mes?mesBR(mes):'todos os meses'}${clTxt?' — '+clTxt:''}`;
+  $('#c-qtd').textContent=ls.length;
+  const A=$('#c-acum'),D=$('#c-det');
+  if(!ls.length){A.innerHTML='<tbody><tr><td class="empty">Nenhum cupom confirmado neste período.</td></tr></tbody>';D.innerHTML='';$('#c-aviso').innerHTML='';return}
+  const totAc=r2(ac.reduce((a,g)=>a+g.total,0)),totCup=r2(ls.reduce((a,c)=>a+c.total,0));
+  A.innerHTML=`<thead><tr><th>Mês</th><th>Cliente</th><th>Produto</th><th>Un.</th><th class="r">Qtde</th><th class="r">Cupons</th><th class="r">Valor acumulado</th></tr></thead>
+    <tbody>${ac.map(g=>`<tr><td>${mesBR(g.mes)}</td><td>${esc(g.cli)}<div class="hint" style="color:var(--mut)">${esc(g.cnpj)}</div></td><td>${esc(g.prod)}</td><td>${esc(g.un)}</td><td class="r">${um?'':fq(g.qtd)}</td><td class="r">${g.n}</td><td class="r">${brl(g.total)}</td></tr>`).join('')}</tbody>
+    <tfoot><tr><td colspan="6">Total a cobrar</td><td class="r">${brl(totAc)}</td></tr></tfoot>`;
+  $('#c-aviso').innerHTML=Math.abs(totAc-totCup)>=0.01?`<div class="bad" style="margin:6px 0">Atenção: a soma dos itens (${brl(totAc)}) difere da soma dos totais dos cupons (${brl(totCup)}). Veja os cupons marcados com ⚠.</div>`:'';
+  D.innerHTML=`<thead><tr><th>Data</th><th>Cupom</th><th>Cliente</th><th class="r">Itens</th><th class="r">Soma dos itens</th><th class="r">Total do cupom</th></tr></thead>
+    <tbody>${ls.map(c=>{const si=somaItens(c),ok=Math.abs(si-c.total)<0.01;return `<tr><td>${dBR(c.data)}</td><td>${esc(c.num)}</td><td>${esc(c.cli)||esc(c.cnpjCli)}</td><td class="r">${itensDe(c).length}</td><td class="r">${ok?brl(si):'<span class="bad">⚠ '+brl(si)+'</span>'}</td><td class="r">${brl(c.total)}</td></tr>`}).join('')}</tbody>
+    <tfoot><tr><td colspan="5">${ls.length} cupom(ns)</td><td class="r">${brl(totCup)}</td></tr></tfoot>`}
+['c-mes','c-cli','c-agr'].forEach(id=>$('#'+id).addEventListener('change',()=>{$('#c-nome-box').style.display=$('#c-agr').value==='um'?'':'none';renderCobranca()}));
+$('#c-nome').addEventListener('input',renderCobranca);
+
+/* ---------- exportação ---------- */
+function baixar(nome,conteudo,tipo){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([conteudo],{type:tipo}));a.download=nome;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
+const csvCell=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
+const csvNum=n=>String(n??0).replace('.',',');
+function exportarCSV(){
+  const ls=cobrancaFiltrada();if(!ls.length){alert('Nada para exportar neste período.');return}
+  const ac=agruparCobranca(ls),um=$('#c-agr').value==='um';
+  const linhas=[['Mês','Cliente','CNPJ','Produto','Un.','Qtde','Cupons','Valor acumulado'],...ac.map(g=>[mesBR(g.mes),g.cli,g.cnpj,g.prod,g.un,um?'':fq(g.qtd),g.n,csvNum(g.total)]),
+    ['TOTAL','','','','','','',csvNum(r2(ac.reduce((a,g)=>a+g.total,0)))]];
+  baixar(`cobranca-${$('#c-mes').value||'todos'}.csv`,'\ufeff'+linhas.map(r=>r.map(csvCell).join(';')).join('\r\n'),'text/csv;charset=utf-8')}
+function carregarScript(src){return new Promise((ok,ko)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>ko(new Error('Falha ao carregar '+src));document.head.appendChild(s)})}
+async function exportarXLSX(){
+  const ls=cobrancaFiltrada();if(!ls.length){alert('Nada para exportar neste período.');return}
+  try{if(!window.XLSX)await carregarScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js')}
+  catch(e){alert('Não consegui carregar o gerador de Excel (é preciso estar com internet). Vou baixar em CSV, que o Excel também abre.');exportarCSV();return}
+  const dt=iso=>{if(!iso)return '';const [y,m,d]=iso.split('-').map(Number);return new Date(y,m-1,d||1,12)};
+  const sheet=(rows,fmts,widths)=>{
+    const ws=XLSX.utils.aoa_to_sheet(rows,{cellDates:true});
+    for(let r=1;r<rows.length;r++)for(let c=0;c<rows[r].length;c++){const cell=ws[XLSX.utils.encode_cell({r,c})];if(cell&&fmts[c])cell.z=fmts[c]}
+    ws['!cols']=widths.map(w=>({wch:w}));ws['!autofilter']={ref:ws['!ref']};return ws};
+  const ac=agruparCobranca(ls),um=$('#c-agr').value==='um';
+  const totAc=r2(ac.reduce((a,g)=>a+g.total,0));
+  const wsA=sheet([['Mês','Cliente','CNPJ','Produto','Un.','Qtde','Cupons','Valor acumulado'],
+    ...ac.map(g=>[dt(g.mes+'-01'),g.cli,g.cnpj,g.prod,g.un,um?'':g.qtd,g.n,g.total]),
+    ['TOTAL','','','','','','',totAc]],
+    {0:'mm/yyyy',5:'#,##0.##',7:'#,##0.00'},[10,32,20,34,6,10,8,16]);
+  const linhasIt=[];
+  for(const c of ls)for(const it of itensDe(c))linhasIt.push([dt(c.data),c.num,c.cli,c.cnpjCli,it.cod||'',it.prod,it.un||'',it.qtd||0,it.vun||0,it.vtot||0]);
+  const wsI=sheet([['Data','Cupom','Cliente','CNPJ','Código','Produto','Un.','Qtde','Valor unit.','Valor total'],...linhasIt,
+    ['TOTAL','','','','','','','','',r2(linhasIt.reduce((a,l)=>a+l[9],0))]],
+    {0:'dd/mm/yyyy',7:'#,##0.##',8:'#,##0.00',9:'#,##0.00'},[11,10,30,20,8,34,6,9,11,13]);
+  const wsC=sheet([['Data','Cupom','Cliente','CNPJ','Itens','Total do cupom'],
+    ...ls.map(c=>[dt(c.data),c.num,c.cli,c.cnpjCli,itensDe(c).length,c.total]),
+    ['TOTAL','','','',linhasIt.length,r2(ls.reduce((a,c)=>a+c.total,0))]],
+    {0:'dd/mm/yyyy',5:'#,##0.00'},[11,10,30,20,7,15]);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,wsA,'Cobrança');XLSX.utils.book_append_sheet(wb,wsI,'Itens');XLSX.utils.book_append_sheet(wb,wsC,'Cupons');
+  XLSX.writeFile(wb,`cobranca-${$('#c-mes').value||'todos'}.xlsx`)}
+
+function exportarBackup(){baixar(`backup-cupons-${hoje()}.json`,JSON.stringify({versao:3,cupons:[...cupons,...pendentes]}),'application/json')}
+async function importarBackup(){
+  const f=$('#imp').files[0];if(!f){alert('Escolha o arquivo de backup.');return}
+  try{
+    const d=JSON.parse(await f.text());if(!d.cupons||!Array.isArray(d.cupons))throw 0;
+    if(!confirm(`Importar ${d.cupons.length} cupons? Cupons com o mesmo ID serão substituídos.`))return;
+    for(const c of d.cupons)await dbPut(c);
+    await carregar();$('#bk-msg').innerHTML=`<span class="ok">${d.cupons.length} cupons importados.</span>`}
+  catch(e){$('#bk-msg').innerHTML='<span class="bad">Arquivo inválido.</span>'}}
+async function apagarTudo(){
+  if(!confirm('Apagar TODOS os cupons deste navegador? Isso não pode ser desfeito.'))return;
+  if(!confirm('Tem certeza? Faça um backup antes se precisar.'))return;
+  await dbClear();await carregar();toast('Dados apagados')}
+
+/* ---------- importação da pasta: imagem → cupons → OCR ---------- */
+function novoCanvas(w,h){const c=document.createElement('canvas');c.width=Math.max(1,Math.round(w));c.height=Math.max(1,Math.round(h));return c}
+function escalar(src,k){const c=novoCanvas(src.width*k,src.height*k);const g=c.getContext('2d');g.imageSmoothingQuality='high';g.drawImage(src,0,0,c.width,c.height);return c}
+function rotCanvas(src,deg){if(!deg)return src;const sw=deg%180===0;const c=novoCanvas(sw?src.width:src.height,sw?src.height:src.width);const g=c.getContext('2d');g.translate(c.width/2,c.height/2);g.rotate(deg*Math.PI/180);g.drawImage(src,-src.width/2,-src.height/2);return c}
+function cortar(src,x0,y0,x1,y1){const c=novoCanvas(x1-x0,y1-y0);c.getContext('2d').drawImage(src,x0,y0,x1-x0,y1-y0,0,0,c.width,c.height);return c}
+function carregarImagem(file){return new Promise((ok,ko)=>{const url=URL.createObjectURL(file),img=new Image();img.onload=()=>ok({img,url});img.onerror=()=>{URL.revokeObjectURL(url);ko(new Error('imagem inválida'))};img.src=url})}
+function canvasJpeg(cv){const m=Math.max(cv.width,cv.height),k=m>1800?1800/m:1;const c=k<1?escalar(cv,k):cv;return c.toDataURL('image/jpeg',.88)}
+
+/* tratamentos diferentes do mesmo cupom (largura final em px, suavização, contraste) */
+const PASSES_TODAS=[{w:1500,sigma:1.0,gamma:0.6},{w:2250,sigma:1.0,gamma:0.6},{w:1200,sigma:1.2,gamma:0.7},{w:1800,sigma:1.0,gamma:0.6},{w:1500,sigma:1.5,gamma:0.5},{w:2250,sigma:1.5,gamma:0.5}];
+let PASSES=PASSES_TODAS.slice(0,4);
+function prepararOCR(cv,ps){
+  const k=ps.w/cv.width;
+  const c=Math.abs(k-1)>0.01?escalar(cv,k):cv;
+  const id=c.getContext('2d').getImageData(0,0,c.width,c.height);
+  const gray=grayFromRGBA(id.data,c.width,c.height);
+  const out=mapaTinta(gray,c.width,c.height,ps.sigma,ps.gamma);
+  const o=novoCanvas(c.width,c.height),g=o.getContext('2d'),od=g.createImageData(c.width,c.height);
+  for(let i=0,j=0;i<out.length;i++,j+=4){od.data[j]=od.data[j+1]=od.data[j+2]=out[i];od.data[j+3]=255}
+  g.putImageData(od,0,0);return o}
+
+let worker=null;
+async function iniciarOCR(setSt){
+  if(worker)return;
+  if(!window.Tesseract){setSt('Baixando o motor de leitura (OCR)…');await carregarScript('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js')}
+  setSt('Carregando o idioma português (só demora na primeira vez)…');
+  worker=await Tesseract.createWorker('por');
+  await worker.setParameters({tessedit_pageseg_mode:'6',preserve_interword_spaces:'1'})}
+async function ocr(cv){const r=await worker.recognize(cv);return (r&&r.data&&r.data.text)||''}
+
+/* endireita a inclinação das linhas do texto (scan torto) */
+function desinclinar(cv){
+  const id=cv.getContext('2d').getImageData(0,0,cv.width,cv.height);
+  const a=anguloInclinacao(grayFromRGBA(id.data,cv.width,cv.height),cv.width,cv.height);
+  if(Math.abs(a)<0.3)return cv;
+  const c=novoCanvas(cv.width,cv.height),g=c.getContext('2d');
+  g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);
+  g.translate(c.width/2,c.height/2);g.rotate(a*Math.PI/180);g.drawImage(cv,-cv.width/2,-cv.height/2);
+  return c}
+/* acha a rotação certa, endireita e lê 3 vezes com tratamentos diferentes; devolve {rc (cupom já girado, colorido), textos[]} */
+async function lerCupom(cv,comOCR){
+  const asp=cv.width/cv.height;
+  if(!comOCR)return {rc:asp>1.15?rotCanvas(cv,90):cv,textos:[],score:0};
+  const rots=asp>=0.8&&asp<=1.25?[0,90,180,270]:(asp<0.8?[0,180]:[90,270]);
+  let best=null;
+  for(const r of rots){
+    const rc=desinclinar(rotCanvas(cv,r)),t=await ocr(prepararOCR(rc,PASSES[0])),sc=pontuarTexto(t);
+    if(!best||sc>best.sc)best={rc,t,sc};
+    if(sc>=10)break}
+  const textos=[best.t];
+  for(const ps of PASSES.slice(1))textos.push(await ocr(prepararOCR(best.rc,ps)));
+  return {rc:best.rc,textos,score:best.sc}}
+
+/* PDF (ex.: digitalização do iPhone/Notas): extrai as fotos JPEG de cada página, sem precisar de biblioteca externa */
+function jpegsDoPDF(u8){
+  const s=new TextDecoder('latin1').decode(u8),out=[],re=/(?<!end)stream\r?\n/g;let m;
+  while((m=re.exec(s))){
+    const ini=m.index,fim=s.indexOf('endstream',re.lastIndex);if(fim<0)break;
+    const pre=s.slice(Math.max(0,ini-800),ini),dic=pre.slice(pre.lastIndexOf('obj'));
+    if(/DCTDecode/.test(dic)&&/Image/.test(dic)){
+      let a=re.lastIndex,b=fim;while(b>a&&(s.charCodeAt(b-1)===10||s.charCodeAt(b-1)===13))b--;
+      if(u8[a]===0xFF&&u8[a+1]===0xD8)out.push(u8.subarray(a,b))}
+    re.lastIndex=fim+9}
+  return out}
+let importando=false;
+const setSt=m=>{$('#imp-status').textContent=m};
+const logl=(m,cls)=>{const l=$('#imp-log');l.style.display='';const d=document.createElement('div');if(cls)d.className=cls;d.textContent=m;l.appendChild(d);l.scrollTop=l.scrollHeight};
+async function importar(files){
+  if(importando)return;
+  const ordem=(a,b)=>cmpNat(a.webkitRelativePath||a.name,b.webkitRelativePath||b.name);
+  const lista=[...files].filter(f=>/\.(png|jpe?g|webp|bmp|gif)$/i.test(f.name)||(f.type||'').startsWith('image/')).sort(ordem).map(f=>({nome:f.webkitRelativePath||f.name,blob:f}));
+  const pdfs=[...files].filter(f=>/\.pdf$/i.test(f.name)).sort(ordem);
+  for(const f of pdfs){
+    try{const pgs=jpegsDoPDF(new Uint8Array(await f.arrayBuffer()));
+      if(!pgs.length)logl(`${f.name}: não achei fotos nas páginas deste PDF. Exporte as páginas como JPEG.`,'bad');
+      else{logl(`${f.name}: ${pgs.length} página(s) encontrada(s)`);pgs.forEach((u,i)=>lista.push({nome:`${f.name} · pág ${i+1}`,blob:new Blob([u],{type:'image/jpeg'})}))}}
+    catch(e){logl(`${f.name}: erro ao abrir o PDF (${e.message})`,'bad')}}
+  const outros=[...files].filter(f=>/\.(tiff?|heic)$/i.test(f.name));
+  $('#imp-log').innerHTML='';
+  if(outros.length)logl(`${outros.length} arquivo(s) TIFF/HEIC ignorado(s). Fotos do iPhone em HEIC: em Ajustes > Câmera > Formatos escolha “Mais Compatível” (JPEG), ou envie a foto pelo AirDrop/e-mail, que converte para JPEG.`,'warn');
+  if(!lista.length){setSt('Nenhuma imagem PNG/JPEG encontrada.');return}
+  importando=true;$('#btn-pasta').disabled=$('#btn-arqs').disabled=true;
+  const multi=$('#imp-multi').checked,bar=$('#imp-bar');bar.style.width='0';
+  PASSES=PASSES_TODAS.slice(0,+$('#imp-qual').value||4);
+  let comOCR=true;
+  try{await iniciarOCR(setSt)}catch(e){comOCR=false;logl('Não consegui carregar o OCR ('+e.message+'). Vou importar só as fotos; você digita os dados na Revisão.','bad')}
+  const prodMap=PROD_MAP();let criados=0;
+  for(let i=0;i<lista.length;i++){
+    const f=lista[i].blob,nome=lista[i].nome;
+    setSt(`Arquivo ${i+1} de ${lista.length}: ${nome}`);await espera();
+    try{
+      const {img,url}=await carregarImagem(f);
+      const k0=Math.min(1,6000/Math.max(img.width,img.height));
+      const full=novoCanvas(img.width*k0,img.height*k0);full.getContext('2d').drawImage(img,0,0,full.width,full.height);URL.revokeObjectURL(url);
+      const ks=Math.min(1,1600/Math.max(full.width,full.height));
+      const small=ks<1?escalar(full,ks):full;
+      const gs=grayFromRGBA(small.getContext('2d').getImageData(0,0,small.width,small.height).data,small.width,small.height);
+      const umPorFoto=small.width/small.height<0.62;/* foto/página de um único cupom (ex.: iPhone) */
+      const caixas=localizarCupons(gs,small.width,small.height,multi&&!umPorFoto);
+      const niveis=new Set();
+      for(const fy of [0.25,0.5,0.75]){const y=Math.min(full.height-1,Math.floor(full.height*fy)),d=full.getContext('2d').getImageData(0,y,full.width,1).data;
+        for(let q=0;q<d.length;q+=4)niveis.add((d[q]*299+d[q+1]*587+d[q+2]*114)/1000|0)}
+      const soPB=niveis.size<=3;
+      if(soPB)logl(`${nome}: ATENÇÃO, esta imagem está em preto e branco puro. O texto fino do cupom térmico se perde nesse modo. Escaneie de novo em tons de cinza ou cor (300 dpi).`,'bad');
+      logl(`${nome}: ${caixas.length} cupom(ns) encontrado(s)`);
+      for(let j=0;j<caixas.length;j++){
+        const b=caixas[j],pad=Math.round(Math.max(b.x1-b.x0,b.y1-b.y0)*0.03);
+        const x0=Math.max(0,Math.floor(b.x0/ks)-pad),y0=Math.max(0,Math.floor(b.y0/ks)-pad),x1=Math.min(full.width,Math.ceil(b.x1/ks)+pad),y1=Math.min(full.height,Math.ceil(b.y1/ks)+pad);
+        setSt(`Arquivo ${i+1} de ${lista.length}: lendo o cupom ${j+1} de ${caixas.length}…`);await espera();
+        const crop=cortar(full,x0,y0,x1,y1);
+        const r=await lerCupom(crop,comOCR);
+        const p=comOCR?mesclarParses(r.textos.map(t=>parseCupom(t,CONHECIDAS,prodMap))):{data:'',num:'',cnpjCli:'',cli:'',totalCupom:0,itens:[],inc:[],avisos:[]};
+        const inc=new Set((p.inc||[]).map(k=>k==='totalCupom'?'total':k).filter(k=>['data','num','total','cnpjCli','cli'].includes(k)));
+        const avisos=[...(p.avisos||[])];
+        const nomeCli=CLI_POR_CNPJ[onlyD(p.cnpjCli)]||p.cli||'';
+        const reg={id:uid(),status:'pendente',data:p.data,num:p.num,total:p.totalCupom||0,emp:p.emp||CONHECIDAS[0].nome,cnpjEmp:p.cnpjEmp||CONHECIDAS[0].cnpj,
+          cli:nomeCli,cnpjCli:p.cnpjCli,itens:(p.itens||[]).map(it=>({cod:it.cod||'',prod:it.prod||'',desc:'',un:it.un||'',qtd:it.qtd||0,vun:it.vun||0,vtot:it.vtot||0,inc:it.inc||[]})),inc:[...inc],avisos,fonte:`${nome} #${j+1}`,ocr:r.textos.map((t,i)=>`----- leitura ${i+1} -----\n${t}`).join('\n'),foto:canvasJpeg(r.rc),obs:''};
+        reg.inc=[...new Set([...reg.inc,'data'])];/* a data sempre deve ser conferida com a foto */
+        if(soPB)reg.avisos.unshift('Esta imagem foi escaneada em preto e branco puro e o texto do cupom se perdeu. Escaneie de novo em tons de cinza ou cor, 300 dpi.');
+        if(comOCR&&consistenciaParse(p)<5){
+          reg.inc=[...new Set([...reg.inc,'data','num','total','cnpjCli','cli'])];
+          for(const it of reg.itens)it.inc=[...new Set([...(it.inc||[]),'prod','qtd','vun','vtot'])];
+          reg.avisos.unshift('Leitura de baixa qualidade (imagem pequena ou apagada). Confira TODOS os campos com a foto. Um scan em 300 dpi melhora muito.')}
+        
+        const dup=[...cupons,...pendentes].find(c=>c.num&&reg.num&&c.num===reg.num&&Math.abs((c.total||0)-reg.total)<0.01);
+        if(dup)reg.avisos.push(`Parece duplicado do cupom nº ${dup.num} (${dup.fonte||'já cadastrado'}). Se for, exclua um dos dois.`);
+        await dbPut(reg);pendentes.push(reg);criados++;
+        logl(`  cupom ${j+1}: nº ${reg.num||'?'} · ${reg.total?brl(reg.total):'total não lido'} · ${reg.itens.length} item(ns) · ${pendencias(reg)} pendência(s)`+(dup?' · possível duplicado':''),dup?'warn':'');
+        await espera()}
+    }catch(e){logl(`${nome}: erro (${e.message})`,'bad')}
+    bar.style.width=Math.round((i+1)/lista.length*100)+'%'}
+  if(worker){try{await worker.terminate()}catch(e){}worker=null}
+  importando=false;$('#btn-pasta').disabled=$('#btn-arqs').disabled=false;
+  $('#imp-pasta').value='';$('#imp-arqs').value='';
+  await carregar();
+  setSt(`Pronto: ${criados} cupom(ns) para revisar.`);
+  if(criados){toast(`${criados} cupom(ns) importado(s)`);show('revisao')}}
+$('#imp-pasta').addEventListener('change',e=>importar(e.target.files));
+$('#imp-arqs').addEventListener('change',e=>importar(e.target.files));
+
+
+
+
+/* ---------- listas auxiliares ---------- */
+function renderTudo(){
+  renderLista();renderRevisao();
+  const uniq=a=>[...new Set(a.filter(Boolean))].sort((x,y)=>x.localeCompare(y,'pt-BR'));
+  $('#dl-emp').innerHTML=uniq([...cupons.map(c=>c.emp),...CONHECIDAS.map(k=>k.nome)]).map(e=>`<option value="${esc(e)}">`).join('');
+  $('#dl-cli').innerHTML=uniq([...cupons.map(c=>c.cli),...Object.values(CLI_POR_CNPJ)]).map(e=>`<option value="${esc(e)}">`).join('');
+  $('#dl-prod').innerHTML=PRODUTOS.map(e=>`<option value="${esc(e)}">`).join('');
+  const meses=[...new Set(cupons.map(c=>mesDe(c.data)).filter(Boolean))].sort().reverse();
+  const sm=$('#c-mes'),cur=sm.value;
+  sm.innerHTML='<option value="">Todos os meses</option>'+meses.map(m=>`<option value="${m}">${mesBR(m)}</option>`).join('');
+  if(!sm.dataset.init){sm.value=meses[0]||'';if(meses.length)sm.dataset.init='1'}
+  else sm.value=(cur===''||meses.includes(cur))?cur:(meses[0]||'');
+  const cl=new Map();for(const c of cupons){const k=onlyD(c.cnpjCli)||c.cli;if(k&&!cl.has(k))cl.set(k,(c.cli||'')+(c.cnpjCli?' · '+c.cnpjCli:''))}
+  const sc=$('#c-cli'),curC=sc.value;
+  sc.innerHTML='<option value="">Todos os clientes</option>'+[...cl].map(([k,t])=>`<option value="${esc(k)}">${esc(t)}</option>`).join('');
+  sc.value=cl.has(curC)?curC:'';
+  if($('#cobranca').classList.contains('active'))renderCobranca()}
+
+/* preenche o CNPJ da empresa pelo nome conhecido */
+$('#f-emp').addEventListener('change',()=>{const k=eConhecida($('#f-emp').value);if(k&&!$('#f-cnpjemp').value){$('#f-cnpjemp').value=k.cnpj;updCnpjEmp()}});
+
+/* ---------- início ---------- */
+(async()=>{
+  try{await openDB();if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();await carregar();preencherForm({data:hoje()});modoForm(false)}
+  catch(e){alert('Não foi possível abrir o armazenamento do navegador. Abra o arquivo em Chrome, Edge ou Firefox (fora do modo anônimo).')}
+})();
+
+</script>
+</body>
+</html>
