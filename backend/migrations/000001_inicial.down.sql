@@ -1,0 +1,8 @@
+DROP TABLE IF EXISTS leituras_log;
+DROP TABLE IF EXISTS cupom_itens;
+DROP TABLE IF EXISTS cupons;
+DROP TABLE IF EXISTS importacoes;
+DROP TABLE IF EXISTS cupom_fotos;
+DROP TABLE IF EXISTS produtos;
+DROP TABLE IF EXISTS clientes;
+DROP TABLE IF EXISTS usuarios;

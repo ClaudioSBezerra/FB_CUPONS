@@ -1,0 +1,129 @@
+# Cupons ITD — produção no VPS Hostinger, em https://cupom.fbtax.cloud
+#
+# No VPS:
+#   git clone https://github.com/ClaudioSBezerra/FB_CUPONS.git
+#   cd FB_CUPONS
+#   cp .env.example .env && nano .env       # preencha TODOS os segredos
+#   docker compose -f deploy/docker-compose.prod.yml up -d --build
+#
+# Antes de subir, aponte o DNS:
+#   cupom.fbtax.cloud  A  <IP do VPS>
+# O Caddy emite e renova o certificado Let's Encrypt sozinho, desde que as
+# portas 80 e 443 estejam abertas e o DNS já esteja propagado.
+
+name: cupons-itd
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-cupons}
+      POSTGRES_USER: ${POSTGRES_USER:-cupons}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env}
+      POSTGRES_INITDB_ARGS: "--locale=C.UTF-8 --encoding=UTF8"
+      TZ: America/Sao_Paulo
+    volumes:
+      - postgres-dados:/var/lib/postgresql/data
+    # Em produção o banco NÃO é publicado: só a rede interna do compose
+    # alcança a porta 5432.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cupons} -d ${POSTGRES_DB:-cupons}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    logging: &logging
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  api:
+    build:
+      context: ../backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PORTA: 8080
+      AMBIENTE: producao
+      DATABASE_URL: postgres://${POSTGRES_USER:-cupons}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-cupons}?sslmode=disable
+      JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET no .env (mínimo 32 caracteres)}
+      SESSAO_HORAS: ${SESSAO_HORAS:-12}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:?defina ADMIN_EMAIL no .env}
+      ADMIN_SENHA: ${ADMIN_SENHA:?defina ADMIN_SENHA no .env}
+      CORS_ORIGENS: ${DOMINIO_URL:-https://cupom.fbtax.cloud}
+      UPLOAD_MAX_MB: ${UPLOAD_MAX_MB:-50}
+
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:?defina ANTHROPIC_API_KEY no .env}
+      CLAUDE_MODEL: ${CLAUDE_MODEL:-claude-opus-5}
+      CLAUDE_MODEL_FORTE: ${CLAUDE_MODEL_FORTE:-claude-fable-5}
+      CLAUDE_ESFORCO: ${CLAUDE_ESFORCO:-high}
+      CLAUDE_TIMEOUT_S: ${CLAUDE_TIMEOUT_S:-180}
+      LEITURA_CONCORRENCIA: ${LEITURA_CONCORRENCIA:-3}
+      LEITURA_LADO_MAX: ${LEITURA_LADO_MAX:-1568}
+      LIMITE_LEITURAS_DIA: ${LIMITE_LEITURAS_DIA:-200}
+      PDF_DPI: ${PDF_DPI:-300}
+    # Não publica porta: quem fala com a API é o Caddy, pela rede interna.
+    logging: *logging
+
+  frontend:
+    build:
+      context: ../frontend
+      args:
+        # Em produção a API é servida sob o mesmo domínio, em /api — assim o
+        # cookie de sessão é first-party e não depende de CORS.
+        VITE_API_URL: ""
+    restart: unless-stopped
+    depends_on:
+      - api
+    logging: *logging
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - api
+      - frontend
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"   # HTTP/3
+    environment:
+      DOMINIO: ${DOMINIO:-cupom.fbtax.cloud}
+      EMAIL_ACME: ${EMAIL_ACME:?defina EMAIL_ACME no .env (avisos de certificado)}
+      UPLOAD_MAX_MB: ${UPLOAD_MAX_MB:-50}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-dados:/data      # certificados: NÃO apague, senão rebate o
+      - caddy-config:/config   # rate limit do Let's Encrypt
+    logging: *logging
+
+  # Backup diário do Postgres com retenção. Roda como serviço próprio para
+  # não depender de cron no host.
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGDATABASE: ${POSTGRES_DB:-cupons}
+      PGUSER: ${POSTGRES_USER:-cupons}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      RETENCAO_DIAS: ${BACKUP_RETENCAO_DIAS:-14}
+      HORA_BACKUP: ${BACKUP_HORA:-03}
+      TZ: America/Sao_Paulo
+    volumes:
+      - ./backups:/backups
+      - ./backup.sh:/usr/local/bin/backup.sh:ro
+    entrypoint: ["/bin/sh", "/usr/local/bin/backup.sh"]
+    logging: *logging
+
+volumes:
+  postgres-dados:
+  caddy-dados:
+  caddy-config:

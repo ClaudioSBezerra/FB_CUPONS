@@ -1,0 +1,62 @@
+# Proxy HTTPS do Cupons ITD.
+#
+# O Caddy obtém e renova o certificado Let's Encrypt automaticamente. O
+# domínio e o e-mail vêm do ambiente, definidos no .env.
+
+{
+	email {$EMAIL_ACME}
+	# Descomente para testar sem gastar o limite de emissão do Let's
+	# Encrypt (o navegador vai reclamar do certificado, é esperado):
+	# acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+}
+
+{$DOMINIO} {
+	encode zstd gzip
+
+	# A API e o frontend vivem no mesmo domínio: o cookie de sessão fica
+	# first-party, sem CORS e sem SameSite=None.
+	handle /api/* {
+		reverse_proxy api:8080 {
+			# Uma página de PDF pode levar minutos na leitura por visão.
+			transport http {
+				read_timeout 15m
+				write_timeout 15m
+			}
+		}
+	}
+
+	handle /healthz {
+		reverse_proxy api:8080
+	}
+
+	handle /readyz {
+		reverse_proxy api:8080
+	}
+
+	handle {
+		reverse_proxy frontend:80
+	}
+
+	# Limite de corpo coerente com UPLOAD_MAX_MB da API, para o upload grande
+	# ser recusado aqui com mensagem clara em vez de estourar no backend.
+	request_body {
+		max_size {$UPLOAD_MAX_MB}MB
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		# A aplicação é self-contained: nada de script ou estilo externo.
+		Content-Security-Policy "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'"
+		-Server
+	}
+
+	log {
+		output stdout
+		format json
+		# Fotos de cupom trazem CNPJ na URL? Não — a rota é /api/cupons/{id}/foto,
+		# sem dado sensível. Mas o corpo nunca é logado.
+	}
+}

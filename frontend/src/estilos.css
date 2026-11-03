@@ -1,0 +1,249 @@
+/* Cupons ITD — interface enxuta, usada em notebook e no celular. */
+
+:root {
+  --fundo: #f6f7f9;
+  --superficie: #ffffff;
+  --borda: #d8dde5;
+  --texto: #1b2430;
+  --texto-fraco: #5b6676;
+  --primaria: #1f5fa8;
+  --primaria-escura: #16477d;
+  /* Amarelo dos campos incertos: é o sinal central da tela de Revisão. */
+  --incerto: #fff3cd;
+  --incerto-borda: #e0ab2a;
+  --erro: #b3261e;
+  --erro-fundo: #fdecea;
+  --ok: #1b7a43;
+  --ok-fundo: #e7f5ec;
+  --raio: 8px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fundo: #14181d;
+    --superficie: #1d242c;
+    --borda: #303a45;
+    --texto: #e8ecf1;
+    --texto-fraco: #9aa7b6;
+    --primaria: #5aa0e8;
+    --primaria-escura: #78b4f0;
+    --incerto: #4a3c12;
+    --incerto-borda: #c99b22;
+    --erro: #f2a097;
+    --erro-fundo: #3a1f1c;
+    --ok: #8ad9a9;
+    --ok-fundo: #1b3326;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--fundo);
+  color: var(--texto);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+/* --- estrutura --- */
+
+.topo {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.6rem 1rem;
+  background: var(--superficie);
+  border-bottom: 1px solid var(--borda);
+  flex-wrap: wrap;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.topo h1 { font-size: 1.05rem; margin: 0; white-space: nowrap; }
+.topo .espaco { flex: 1; }
+.topo .usuario { color: var(--texto-fraco); font-size: 0.85rem; }
+
+.abas { display: flex; gap: 0.25rem; flex-wrap: wrap; }
+
+.abas button {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--raio);
+  padding: 0.4rem 0.75rem;
+  cursor: pointer;
+  color: var(--texto-fraco);
+  font-size: 0.9rem;
+}
+
+.abas button:hover { background: var(--fundo); }
+.abas button[aria-current="page"] {
+  background: var(--primaria);
+  color: #fff;
+  font-weight: 600;
+}
+
+main { padding: 1rem; max-width: 1400px; margin: 0 auto; }
+
+.cartao {
+  background: var(--superficie);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.cartao h2 { margin-top: 0; font-size: 1.05rem; }
+
+/* --- formulários --- */
+
+label { display: block; font-size: 0.82rem; color: var(--texto-fraco); margin-bottom: 0.2rem; }
+
+input, select, textarea, button {
+  font: inherit;
+  color: var(--texto);
+}
+
+input, select, textarea {
+  width: 100%;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--borda);
+  border-radius: 6px;
+  background: var(--superficie);
+}
+
+input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible {
+  outline: 2px solid var(--primaria);
+  outline-offset: 1px;
+}
+
+/* Campo que a leitura marcou como incerto: amarelo, como no protótipo. */
+.incerto, input.incerto, td.incerto input {
+  background: var(--incerto);
+  border-color: var(--incerto-borda);
+}
+
+.linha { display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: flex-end; }
+.linha > * { flex: 1 1 10rem; min-width: 0; }
+.linha > .estreito { flex: 0 0 7rem; }
+
+button.acao {
+  background: var(--primaria);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.5rem 0.9rem;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+button.acao:hover:not(:disabled) { background: var(--primaria-escura); }
+button.acao:disabled { opacity: 0.5; cursor: not-allowed; }
+
+button.secundaria {
+  background: var(--superficie);
+  border: 1px solid var(--borda);
+  border-radius: 6px;
+  padding: 0.5rem 0.9rem;
+  cursor: pointer;
+}
+
+button.perigo { background: var(--erro); color: #fff; border: none; }
+
+/* --- tabelas --- */
+
+.rolagem { overflow-x: auto; }
+
+table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+
+th, td {
+  text-align: left;
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid var(--borda);
+  white-space: nowrap;
+}
+
+th { color: var(--texto-fraco); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; }
+td.numero, th.numero { text-align: right; font-variant-numeric: tabular-nums; }
+tbody tr:hover { background: var(--fundo); }
+tfoot td { font-weight: 700; border-top: 2px solid var(--borda); }
+
+/* --- avisos --- */
+
+.aviso, .erro, .sucesso {
+  border-radius: var(--raio);
+  padding: 0.6rem 0.8rem;
+  margin: 0.5rem 0;
+  font-size: 0.9rem;
+}
+
+.aviso { background: var(--incerto); border: 1px solid var(--incerto-borda); }
+.erro { background: var(--erro-fundo); border: 1px solid var(--erro); color: var(--erro); }
+.sucesso { background: var(--ok-fundo); border: 1px solid var(--ok); color: var(--ok); }
+
+.aviso ul, .erro ul { margin: 0.3rem 0 0; padding-left: 1.2rem; }
+
+.etiqueta {
+  display: inline-block;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.etiqueta.pendente { background: var(--incerto); color: #7a5c00; }
+.etiqueta.confirmado { background: var(--ok-fundo); color: var(--ok); }
+.etiqueta.rejeitado { background: var(--erro-fundo); color: var(--erro); }
+
+/* --- importar --- */
+
+.solta {
+  border: 2px dashed var(--borda);
+  border-radius: var(--raio);
+  padding: 2.5rem 1rem;
+  text-align: center;
+  color: var(--texto-fraco);
+  cursor: pointer;
+  background: var(--superficie);
+}
+
+.solta.ativa { border-color: var(--primaria); background: var(--fundo); }
+
+/* --- revisão: foto ao lado do formulário --- */
+
+.revisao { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1rem; }
+
+@media (max-width: 900px) {
+  .revisao { grid-template-columns: 1fr; }
+}
+
+.foto-area {
+  position: sticky;
+  top: 4rem;
+  background: var(--superficie);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  padding: 0.5rem;
+  max-height: calc(100vh - 6rem);
+  overflow: auto;
+}
+
+.foto-area img {
+  display: block;
+  max-width: 100%;
+  transform-origin: top left;
+  transition: transform 0.1s;
+}
+
+.ferramentas-foto { display: flex; gap: 0.4rem; margin-bottom: 0.5rem; flex-wrap: wrap; }
+
+.vazio { color: var(--texto-fraco); text-align: center; padding: 2rem; }
+
+.login {
+  max-width: 22rem;
+  margin: 15vh auto;
+}
+
+.ajuda { font-size: 0.8rem; color: var(--texto-fraco); }

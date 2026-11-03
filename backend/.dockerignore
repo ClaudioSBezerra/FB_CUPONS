@@ -1,0 +1,7 @@
+# O contexto do build precisa dos testes (rodam dentro do Dockerfile) e das
+# migrations (vão embutidas no binário). Fora disso, nada de artefato local.
+Dockerfile
+.dockerignore
+bin/
+tmp/
+*.out

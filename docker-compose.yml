@@ -1,0 +1,79 @@
+# Cupons ITD — desenvolvimento local.
+#
+#   cp .env.example .env    # preencha ANTHROPIC_API_KEY, JWT_SECRET, senhas
+#   docker compose up --build
+#
+# A API fica em http://localhost:8080 e o frontend em http://localhost:5173.
+# Para produção use deploy/docker-compose.prod.yml, que acrescenta o proxy
+# HTTPS para cupom.fbtax.cloud.
+
+name: cupons-itd
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-cupons}
+      POSTGRES_USER: ${POSTGRES_USER:-cupons}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env}
+      # Locale pt-BR para ordenação correta de nomes com acento.
+      POSTGRES_INITDB_ARGS: "--locale=C.UTF-8 --encoding=UTF8"
+      TZ: America/Sao_Paulo
+    volumes:
+      - postgres-dados:/var/lib/postgresql/data
+    ports:
+      # Exposto só no localhost: útil para psql e DBeaver, sem abrir o banco.
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cupons} -d ${POSTGRES_DB:-cupons}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  api:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PORTA: 8080
+      AMBIENTE: ${AMBIENTE:-desenvolvimento}
+      DATABASE_URL: postgres://${POSTGRES_USER:-cupons}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-cupons}?sslmode=disable
+      JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET no .env (mínimo 32 caracteres)}
+      SESSAO_HORAS: ${SESSAO_HORAS:-12}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_SENHA: ${ADMIN_SENHA:-}
+      CORS_ORIGENS: ${CORS_ORIGENS:-http://localhost:5173}
+      UPLOAD_MAX_MB: ${UPLOAD_MAX_MB:-50}
+
+      # Leitura via Claude. Sem a chave, a API sobe e tudo funciona menos a
+      # importação automática por PDF.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      CLAUDE_MODEL: ${CLAUDE_MODEL:-claude-opus-5}
+      CLAUDE_MODEL_FORTE: ${CLAUDE_MODEL_FORTE:-claude-fable-5}
+      CLAUDE_ESFORCO: ${CLAUDE_ESFORCO:-high}
+      CLAUDE_TIMEOUT_S: ${CLAUDE_TIMEOUT_S:-180}
+      LEITURA_CONCORRENCIA: ${LEITURA_CONCORRENCIA:-3}
+      LEITURA_LADO_MAX: ${LEITURA_LADO_MAX:-1568}
+      LIMITE_LEITURAS_DIA: ${LIMITE_LEITURAS_DIA:-0}
+      PDF_DPI: ${PDF_DPI:-300}
+    ports:
+      - "${API_PORTA:-8080}:8080"
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8080}
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "${FRONTEND_PORTA:-5173}:80"
+
+volumes:
+  postgres-dados:
