@@ -282,12 +282,19 @@ Executado com `docker compose up` e os dois JSONs do legado:
 | Dona Íris | 12 confirmados **R$ 11.500,46** + 5 pendentes |
 | Total confirmado | **R$ 18.726,23** |
 | Reimportar os mesmos arquivos | 18 ignorados, 0 duplicados |
-| Cobrança vs. xlsx de referência | 31 chaves, **idênticas** em qtd, nº de cupons e valor |
+| Cobrança vs. xlsx de referência | 31 chaves, idênticas em qtd e nº de cupons; em valor, iguais a menos de um resíduo de float no **arquivo de referência** (ver nota abaixo) |
 | Excel gerado | subtotais e total exatos; data serial 46311 = 16/10/2026, sem desvio de fuso |
 | Topologia do Coolify (sem porta publicada) | API sobe em `producao`, nginx serve a SPA e repassa `/api` e `/readyz` pela rede interna |
 | Subida sem `ANTHROPIC_API_KEY` | API sobe com aviso; `/me` devolve `leitura_habilitada: false` e `POST /importacoes` responde 503 explicando — sem 500 nem tela quebrada |
 | Senha do banco com espaço, `@`, `/` e `#` | sobe normalmente: a API monta a DSN com percent-encoding a partir das partes |
 | `ADMIN_SENHA=123` (curta) | API sobe, sorteia senha forte, cria o admin e anuncia no log; login com essa senha devolve 200 e cookie `HttpOnly; Secure` |
+| Ensaio completo em modo `producao` | login, importação dos dois JSONs, reimportação sem duplicar (12 ignorados, 5 pendentes atualizados), cobrança e download do Excel — tudo pela rede interna, com `Authorization: Bearer` no lugar do cookie `Secure` |
+
+**Nota sobre a única diferença de valor:** o xlsx do protótipo traz
+`99.90000000000001` para 10 × PÃO DE FORMA 500G a R$ 9,99 — resíduo de float64 do
+JavaScript. A API devolve `99.90` exatos. Com tolerância de R$ 0,01 não há
+nenhuma divergência nas 31 chaves, e onde há diferença é o sistema novo que está
+certo. É exatamente o que `dominio.Valor` em centavos inteiros existe para evitar.
 
 Três bugs foram encontrados e corrigidos nesse processo — todos invisíveis sem um
 Postgres de verdade:
