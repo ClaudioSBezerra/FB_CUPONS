@@ -55,7 +55,7 @@ func Abrir(ctx context.Context, dsn string) (*Store, error) {
 	defer cancel()
 	if err := pool.Ping(ctxPing); err != nil {
 		pool.Close()
-		return nil, fmt.Errorf("o banco não respondeu: %w", err)
+		return nil, ExplicarErroConexao(err)
 	}
 	return &Store{pool: pool}, nil
 }
@@ -84,7 +84,8 @@ func MigrarFS(dsn string, fsys iofsFS, caminho string) error {
 
 	driver, err := postgres.WithInstance(db, &postgres.Config{})
 	if err != nil {
-		return fmt.Errorf("driver de migration: %w", err)
+		return fmt.Errorf("não foi possível conectar para aplicar as migrations: %w",
+			ExplicarErroConexao(err))
 	}
 
 	m, err := migrate.NewWithInstance("iofs", fonte, "postgres", driver)
@@ -95,6 +96,31 @@ func MigrarFS(dsn string, fsys iofsFS, caminho string) error {
 		return fmt.Errorf("falha ao aplicar as migrations: %w", err)
 	}
 	return nil
+}
+
+// ExplicarErroConexao traduz as falhas de conexão mais comuns para algo que
+// diga o que fazer, em vez de só repetir o código do driver.
+func ExplicarErroConexao(err error) error {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		switch pgErr.Code {
+		case "28P01": // invalid_password
+			return fmt.Errorf("o Postgres recusou a senha do usuário do banco: %w\n\n"+
+				"Atenção: POSTGRES_PASSWORD só tem efeito na PRIMEIRA inicialização do "+
+				"Postgres. Se o volume de dados já existia de uma tentativa anterior, ele "+
+				"guarda a senha antiga, e trocar a variável não muda nada.\n"+
+				"Saídas: (a) apagar o volume do Postgres e deixar recriar — só faça isso se "+
+				"ainda não houver dados; ou (b) trocar a senha dentro do banco, com "+
+				`ALTER USER <usuario> WITH PASSWORD '<nova>';`, err)
+		case "3D000": // invalid_catalog_name
+			return fmt.Errorf("o banco de dados informado não existe: %w\n"+
+				"Confira DB_NOME (ou o caminho da DATABASE_URL)", err)
+		case "28000": // invalid_authorization_specification
+			return fmt.Errorf("o usuário do banco não tem autorização para conectar: %w\n"+
+				"Confira DB_USUARIO", err)
+		}
+	}
+	return fmt.Errorf("o banco não respondeu: %w", err)
 }
 
 // ehViolacaoUnicidade identifica o erro 23505 do Postgres.

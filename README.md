@@ -122,6 +122,26 @@ Não use o `docker-compose.prod.yml` aqui: o Caddy dele disputaria as portas
 > **O admin é criado uma única vez**, na primeira subida com a tabela de usuários
 > vazia. Mudar `ADMIN_SENHA` depois não altera o usuário existente.
 
+> **`POSTGRES_PASSWORD` também só vale na primeira inicialização.** A senha fica
+> gravada no papel do banco, dentro do volume. Se um deploy anterior já criou o
+> volume, trocar a variável faz a API mandar a senha nova para um banco que
+> guarda a antiga, e o log mostra
+> `password authentication failed for user "cupons"`. Saídas:
+>
+> - **volume ainda sem dados** (o caso de um deploy que nunca chegou a aplicar as
+>   migrations): apague o volume do Postgres na aba **Storages** do recurso e
+>   redeploy;
+> - **volume com dados**: troque a senha dentro do banco, sem apagar nada —
+>   ```bash
+>   docker exec -it <container-do-postgres> \
+>     psql -U cupons -d cupons -c "ALTER USER cupons WITH PASSWORD 'a-senha-do-painel';"
+>   ```
+>   (funciona sem senha porque a conexão pelo socket local é confiável na imagem
+>   oficial), e então redeploy.
+>
+> A API detecta esse caso e imprime essa explicação no log em vez de só repetir
+> o erro do driver.
+
 ### No VPS com Docker puro
 
 1. **DNS** (antes de subir, para o Let's Encrypt validar):
