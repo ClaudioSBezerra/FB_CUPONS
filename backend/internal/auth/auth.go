@@ -3,8 +3,10 @@
 package auth
 
 import (
+	"crypto/rand"
 	"errors"
 	"fmt"
+	"math/big"
 	"net/http"
 	"strconv"
 	"time"
@@ -43,10 +45,30 @@ type Sessao struct {
 	Papel     string
 }
 
+// MinimoSenha é o tamanho mínimo de uma senha de usuário.
+const MinimoSenha = 8
+
+// SenhaAleatoria sorteia uma senha forte, legível e sem caracteres ambíguos
+// (0/O, 1/l/I), para ser ditada ou copiada do log sem erro.
+func SenhaAleatoria() (string, error) {
+	const alfabeto = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789"
+	const tamanho = 20
+
+	b := make([]byte, tamanho)
+	for i := range b {
+		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(alfabeto))))
+		if err != nil {
+			return "", fmt.Errorf("não foi possível sortear a senha: %w", err)
+		}
+		b[i] = alfabeto[n.Int64()]
+	}
+	return string(b), nil
+}
+
 // HashSenha gera o hash bcrypt de uma senha.
 func HashSenha(senha string) (string, error) {
-	if len(senha) < 8 {
-		return "", fmt.Errorf("a senha precisa ter pelo menos 8 caracteres")
+	if len(senha) < MinimoSenha {
+		return "", fmt.Errorf("a senha precisa ter pelo menos %d caracteres", MinimoSenha)
 	}
 	h, err := bcrypt.GenerateFromPassword([]byte(senha), bcrypt.DefaultCost)
 	if err != nil {

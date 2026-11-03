@@ -14,9 +14,12 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-cupons}
-      POSTGRES_USER: ${POSTGRES_USER:-cupons}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env}
+      # Dirigido pelas mesmas DB_* que a API usa: um nome por coisa,
+      # como nos outros projetos FB. Vale só na PRIMEIRA inicialização
+      # do volume — trocar depois exige ALTER USER no banco.
+      POSTGRES_DB: ${DB_NAME:-cupons}
+      POSTGRES_USER: ${DB_USER:-cupons}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?defina DB_PASSWORD}
       # Locale pt-BR para ordenação correta de nomes com acento.
       POSTGRES_INITDB_ARGS: "--locale=C.UTF-8 --encoding=UTF8"
       TZ: America/Sao_Paulo
@@ -28,7 +31,7 @@ services:
       # nativo na 5432; a API não usa esta porta (fala pela rede interna).
       - "127.0.0.1:${POSTGRES_PORTA:-5432}:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cupons} -d ${POSTGRES_DB:-cupons}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-cupons} -d ${DB_NAME:-cupons}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -48,10 +51,10 @@ services:
       # percent-encoding, então senha com espaço, "@", "/" ou "#" funciona.
       # Colar a senha dentro de uma URL aqui quebrava o deploy.
       DB_HOST: postgres
-      DB_PORTA: 5432
-      DB_USUARIO: ${POSTGRES_USER:-cupons}
-      DB_SENHA: ${POSTGRES_PASSWORD}
-      DB_NOME: ${POSTGRES_DB:-cupons}
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-cupons}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME:-cupons}
       DB_SSLMODE: disable
       JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET no .env (mínimo 32 caracteres)}
       SESSAO_HORAS: ${SESSAO_HORAS:-12}

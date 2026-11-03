@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -31,6 +32,60 @@ func main() {
 	}
 }
 
+// garantirAdmin cria o usuário administrador inicial quando o banco ainda não
+// tem nenhum usuário. Problemas aqui são avisados, não fatais.
+func garantirAdmin(ctx context.Context, cfg config.Config, st *store.Store, log *slog.Logger) {
+	if cfg.AdminEmail == "" {
+		log.Warn("ADMIN_EMAIL não definida: nenhum usuário será criado automaticamente. " +
+			"Sem um usuário, ninguém consegue entrar no sistema")
+		return
+	}
+
+	senha := cfg.AdminSenha
+	sorteada := false
+	if !cfg.SenhaAdminUtilizavel() {
+		nova, err := auth.SenhaAleatoria()
+		if err != nil {
+			log.Error("não foi possível sortear a senha do administrador; nenhum usuário foi criado",
+				"erro", err)
+			return
+		}
+		senha, sorteada = nova, true
+	}
+
+	hash, err := auth.HashSenha(senha)
+	if err != nil {
+		log.Error("não foi possível preparar a senha do administrador; nenhum usuário foi criado",
+			"erro", err)
+		return
+	}
+
+	criado, err := st.GarantirAdmin(ctx, cfg.AdminEmail, "Administrador", hash)
+	if err != nil {
+		log.Error("não foi possível criar o administrador inicial; a API segue no ar",
+			"erro", err, "email", cfg.AdminEmail)
+		return
+	}
+
+	switch {
+	case criado && sorteada:
+		motivo := "ADMIN_SENHA não foi definida"
+		if cfg.AdminSenha != "" {
+			motivo = fmt.Sprintf("ADMIN_SENHA tem %d caracteres e o mínimo é %d",
+				len(cfg.AdminSenha), config.MinimoSenha)
+		}
+		// A senha aparece no log UMA vez, de propósito: é a única forma de o
+		// operador entrar, e o alternativa seria a API não subir.
+		log.Warn("administrador criado com SENHA SORTEADA — anote e troque assim que entrar",
+			"email", cfg.AdminEmail, "senha", senha, "motivo", motivo)
+	case criado:
+		log.Info("usuário administrador criado", "email", cfg.AdminEmail)
+	default:
+		log.Info("já existe usuário cadastrado; o administrador não foi recriado",
+			"observacao", "mudar ADMIN_SENHA não altera usuário existente")
+	}
+}
+
 func executar(log *slog.Logger) error {
 	cfg, err := config.Carregar()
 	if err != nil {
@@ -52,22 +107,12 @@ func executar(log *slog.Logger) error {
 	}
 	defer st.Fechar()
 
-	// 2. Administrador inicial, se o banco está vazio.
-	if cfg.AdminEmail != "" && cfg.AdminSenha != "" {
-		hash, err := auth.HashSenha(cfg.AdminSenha)
-		if err != nil {
-			return err
-		}
-		criado, err := st.GarantirAdmin(ctx, cfg.AdminEmail, "Administrador", hash)
-		if err != nil {
-			return err
-		}
-		if criado {
-			log.Info("usuário administrador criado", "email", cfg.AdminEmail)
-		}
-	} else {
-		log.Warn("ADMIN_EMAIL/ADMIN_SENHA não definidos: nenhum usuário será criado automaticamente")
-	}
+	// 2. Administrador inicial. NUNCA fatal: se a senha informada não serve,
+	//    sorteia-se uma e anuncia-se no log. Uma API com banco de pé e
+	//    migrations aplicadas não deve ficar fora do ar por causa da senha de
+	//    bootstrap — foi exatamente esse laço de reinício que atrasou o
+	//    primeiro deploy.
+	garantirAdmin(ctx, cfg, st, log)
 
 	// 3. Leitor de cupons. Sem credencial, o sistema sobe sem leitura
 	//    automática — revisão manual, cobrança e Excel continuam valendo.

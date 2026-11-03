@@ -29,28 +29,34 @@
 #   4. Em Domains, atribua cupom.fbtax.cloud ao serviço "frontend", porta 80
 #   5. Deploy
 #
-# Variáveis obrigatórias no painel (o deploy falha sem elas, com mensagem):
-#   POSTGRES_PASSWORD   JWT_SECRET (mín. 32 caracteres)
-#   ADMIN_EMAIL         ADMIN_SENHA
+# Variáveis do painel: copie o bloco de coolify-env-template.txt.
 #
-# Opcionais:
-#   ANTHROPIC_API_KEY   sem ela a importação por PDF fica desativada
-#   DOMINIO_URL         origem liberada no CORS para clientes externos
+# Obrigatórias (sem elas o deploy nem começa):
+#   DB_PASSWORD   JWT_SECRET
+#
+# Recomendadas (sem elas a API SOBE, mas avisa no log):
+#   ADMIN_EMAIL   ADMIN_SENHA   — sem senha válida, uma é sorteada e anunciada
+#                                 no log; sem e-mail, nenhum usuário é criado
+#   DOMINIO_URL                 — origem liberada no CORS
+#   ANTHROPIC_API_KEY           — sem ela a importação por PDF fica desativada
 
 services:
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-cupons}
-      POSTGRES_USER: ${POSTGRES_USER:-cupons}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no painel do Coolify}
+      # Dirigido pelas mesmas DB_* que a API usa: um nome por coisa,
+      # como nos outros projetos FB. Vale só na PRIMEIRA inicialização
+      # do volume — trocar depois exige ALTER USER no banco.
+      POSTGRES_DB: ${DB_NAME:-cupons}
+      POSTGRES_USER: ${DB_USER:-cupons}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?defina DB_PASSWORD}
       POSTGRES_INITDB_ARGS: "--locale=C.UTF-8 --encoding=UTF8"
       TZ: America/Sao_Paulo
     volumes:
       - postgres-dados:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cupons} -d ${POSTGRES_DB:-cupons}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-cupons} -d ${DB_NAME:-cupons}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -70,10 +76,10 @@ services:
       # percent-encoding, então senha com espaço, "@", "/" ou "#" funciona.
       # Colar a senha dentro de uma URL aqui quebrava o deploy.
       DB_HOST: postgres
-      DB_PORTA: 5432
-      DB_USUARIO: ${POSTGRES_USER:-cupons}
-      DB_SENHA: ${POSTGRES_PASSWORD}
-      DB_NOME: ${POSTGRES_DB:-cupons}
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-cupons}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME:-cupons}
       DB_SSLMODE: disable
       JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET no painel do Coolify}
       SESSAO_HORAS: ${SESSAO_HORAS:-12}

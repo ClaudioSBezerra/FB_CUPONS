@@ -22,6 +22,10 @@ type Config struct {
 
 	// Banco
 	DatabaseURL string
+	// dbSenhaVazia registra que a DSN foi montada das partes e DB_PASSWORD
+	// veio vazia. Em produção isso é variável esquecida, não autenticação
+	// "trust", e precisa ser apontado antes de a conexão falhar.
+	dbSenhaVazia bool
 
 	// Autenticação
 	JWTSecret     string
@@ -48,7 +52,7 @@ type Config struct {
 func Carregar() (Config, error) {
 	c := Config{
 		Porta:             texto("PORTA", "8080"),
-		Ambiente:          texto("AMBIENTE", "desenvolvimento"),
+		Ambiente:          ambiente(),
 		UploadMaxMB:       int64(numero("UPLOAD_MAX_MB", 50)),
 		DatabaseURL:       os.Getenv("DATABASE_URL"),
 		JWTSecret:         os.Getenv("JWT_SECRET"),
@@ -70,12 +74,13 @@ func Carregar() (Config, error) {
 	// DATABASE_URL completa tem precedência; sem ela, monta-se a partir das
 	// partes, com a senha percent-encoded por net/url.
 	if c.DatabaseURL == "" {
+		c.dbSenhaVazia = os.Getenv("DB_PASSWORD") == ""
 		c.DatabaseURL = montarDSN(
 			texto("DB_HOST", "postgres"),
-			texto("DB_PORTA", "5432"),
-			texto("DB_USUARIO", "cupons"),
-			os.Getenv("DB_SENHA"),
-			texto("DB_NOME", "cupons"),
+			texto("DB_PORT", "5432"),
+			texto("DB_USER", "cupons"),
+			os.Getenv("DB_PASSWORD"),
+			texto("DB_NAME", "cupons"),
 			texto("DB_SSLMODE", "disable"),
 		)
 	}
@@ -87,29 +92,8 @@ func Carregar() (Config, error) {
 		}
 	}
 
-	var faltando []string
-	if c.DatabaseURL == "" {
-		faltando = append(faltando, "DATABASE_URL (ou DB_HOST/DB_USUARIO/DB_SENHA/DB_NOME)")
-	}
-	if c.JWTSecret == "" {
-		faltando = append(faltando, "JWT_SECRET")
-	}
-	if len(faltando) > 0 {
-		return Config{}, fmt.Errorf("variáveis de ambiente obrigatórias não definidas: %s",
-			strings.Join(faltando, ", "))
-	}
-	if len(c.JWTSecret) < 32 {
-		return Config{}, fmt.Errorf("JWT_SECRET precisa ter pelo menos 32 caracteres (tem %d)", len(c.JWTSecret))
-	}
-	// Confere a DSN aqui, onde é possível explicar o que fazer. Sem isto, uma
-	// senha com espaço ou "@" só falha lá dentro do driver, com mensagem que
-	// não diz onde arrumar.
-	if err := conferirDSN(c.DatabaseURL); err != nil {
+	if err := c.validar(); err != nil {
 		return Config{}, err
-	}
-
-	if c.Producao() && len(c.OrigensCORS) == 0 {
-		return Config{}, fmt.Errorf("em produção, defina CORS_ORIGENS (ex.: https://cupom.fbtax.cloud)")
 	}
 
 	return c, nil
@@ -122,6 +106,87 @@ func (c Config) Producao() bool { return c.Ambiente == "producao" }
 // Sem ela o sistema sobe normalmente: cadastros, revisão manual, cobrança e
 // Excel continuam funcionando, só a leitura automática fica indisponível.
 func (c Config) LeituraHabilitada() bool { return c.AnthropicAPIKey != "" }
+
+// validar confere a configuração inteira e devolve TODOS os problemas de uma
+// vez, numerados.
+//
+// Antes, cada problema derrubava a subida isoladamente: o operador corrigia um,
+// redeployava, descobria o seguinte. Em deploy de produção isso custa uma
+// rodada de build por erro. Aqui só entram os impedimentos reais de servir —
+// o que é conveniência (criar o admin inicial, ler cupons) vira aviso no log e
+// não impede a API de subir.
+func (c Config) validar() error {
+	var problemas []string
+
+	if c.DatabaseURL == "" {
+		problemas = append(problemas,
+			"não há como conectar ao banco: defina DATABASE_URL, ou DB_HOST/DB_USER/DB_PASSWORD/DB_NAME")
+	} else if err := conferirDSN(c.DatabaseURL); err != nil {
+		problemas = append(problemas, err.Error())
+	}
+
+	if c.dbSenhaVazia && c.Producao() {
+		problemas = append(problemas,
+			"DB_PASSWORD está vazia. Em produção o banco exige senha — confira a variável no painel")
+	}
+
+	switch {
+	case c.JWTSecret == "":
+		problemas = append(problemas,
+			"JWT_SECRET não definida. Gere com: openssl rand -hex 64")
+	case len(c.JWTSecret) < MinimoJWTSecret:
+		problemas = append(problemas, fmt.Sprintf(
+			"JWT_SECRET tem %d caracteres e precisa de no mínimo %d. Gere com: openssl rand -hex 64",
+			len(c.JWTSecret), MinimoJWTSecret))
+	}
+
+	if c.Producao() && len(c.OrigensCORS) == 0 {
+		problemas = append(problemas,
+			"em produção defina CORS_ORIGENS (ex.: https://cupom.fbtax.cloud)")
+	}
+
+	if len(problemas) == 0 {
+		return nil
+	}
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "a configuração tem %d problema(s) que impedem a API de subir:", len(problemas))
+	for i, p := range problemas {
+		fmt.Fprintf(&b, "\n  %d. %s", i+1, p)
+	}
+	return fmt.Errorf("%s", b.String())
+}
+
+// MinimoJWTSecret é o tamanho mínimo aceito para a chave de assinatura das
+// sessões. Abaixo disso a chave é adivinhável por força bruta.
+const MinimoJWTSecret = 32
+
+// MinimoSenha é o tamanho mínimo de senha de usuário.
+const MinimoSenha = 8
+
+// SenhaAdminUtilizavel informa se ADMIN_SENHA serve para criar o usuário
+// inicial. Quando não serve, a subida NÃO falha: uma senha é sorteada e
+// anunciada no log (ver cmd/api). Derrubar uma API cujo banco está de pé por
+// causa da senha de bootstrap seria trocar um problema pequeno por um grande.
+func (c Config) SenhaAdminUtilizavel() bool {
+	return len(c.AdminSenha) >= MinimoSenha
+}
+
+// ambiente aceita AMBIENTE (deste projeto) e ENVIRONMENT (nome usado nos
+// outros projetos FB), para a configuração poder ser copiada entre eles.
+func ambiente() string {
+	if v := texto("AMBIENTE", ""); v != "" {
+		return v
+	}
+	switch strings.ToLower(texto("ENVIRONMENT", "")) {
+	case "production", "producao", "produção":
+		return "producao"
+	case "":
+		return "desenvolvimento"
+	default:
+		return "desenvolvimento"
+	}
+}
 
 // montarDSN monta a URL de conexão a partir das partes.
 //
@@ -147,7 +212,7 @@ func conferirDSN(dsn string) error {
 	if err != nil {
 		return fmt.Errorf("DATABASE_URL não é uma URL válida: %w\n"+
 			"Se a senha tem espaço ou um dos caracteres @ / : ? #, não monte a URL à mão: "+
-			"defina DB_HOST, DB_PORTA, DB_USUARIO, DB_SENHA e DB_NOME, que a API escapa a senha sozinha", err)
+			"defina DB_HOST, DB_PORT, DB_USER, DB_PASSWORD e DB_NAME, que a API escapa a senha sozinha", err)
 	}
 	if u.Scheme != "postgres" && u.Scheme != "postgresql" {
 		return fmt.Errorf("DATABASE_URL deve começar com postgres:// (veio %q)", u.Scheme)

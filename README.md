@@ -105,13 +105,32 @@ Não use o `docker-compose.prod.yml` aqui: o Caddy dele disputaria as portas
 2. Em **Docker Compose Location**, troque para **`/docker-compose.coolify.yml`**.
    O padrão é `/docker-compose.yml`, que é o de desenvolvimento e publica porta
    no host — é o que causa `Bind for 0.0.0.0:8080 failed: port is already allocated`.
-3. Em **Environment Variables**, defina as obrigatórias — `POSTGRES_PASSWORD`,
-   `JWT_SECRET` (mín. 32 caracteres), `ADMIN_EMAIL` e `ADMIN_SENHA`. O deploy
-   falha sem elas, com a mensagem dizendo qual falta.
-   Opcionais: `ANTHROPIC_API_KEY` (sem ela a importação por PDF fica desativada
-   e o resto funciona) e `DOMINIO_URL=https://cupom.fbtax.cloud`.
+3. Em **Environment Variables**, cole o bloco de
+   [`coolify-env-template.txt`](coolify-env-template.txt) e substitua o que está
+   em MAIÚSCULAS.
 4. Em **Domains**, atribua `cupom.fbtax.cloud` ao serviço **frontend**, porta **80**.
 5. Deploy.
+
+#### O que impede a API de subir, e o que só avisa
+
+Só duas coisas são fatais, porque sem elas a API não tem como servir:
+
+| Fatal | Por quê |
+|---|---|
+| banco inacessível ou migration falhando | não há onde ler nem gravar |
+| `JWT_SECRET` ausente ou com menos de 32 caracteres | sessão forjável |
+
+Todo o resto **avisa no log e a API sobe**:
+
+| Situação | O que acontece |
+|---|---|
+| `ANTHROPIC_API_KEY` ausente | aba Importar desativada; revisão, cobrança e Excel funcionam |
+| `ADMIN_SENHA` ausente ou curta | a API **sorteia** uma senha forte, cria o admin e anuncia no log: `administrador criado com SENHA SORTEADA` |
+| `ADMIN_EMAIL` ausente | nenhum usuário é criado, com aviso de que ninguém poderá entrar |
+| já existe usuário | o admin não é recriado, com aviso de que trocar `ADMIN_SENHA` não altera quem existe |
+
+E a validação é **acumulada**: um único deploy lista todos os problemas de
+configuração numerados, em vez de morrer num por reinício.
 
 > **Por que esse arquivo fica na raiz e não em `deploy/`:** o Coolify roda o
 > compose com `--project-directory` na raiz do repositório, e o Docker Compose
@@ -268,6 +287,7 @@ Executado com `docker compose up` e os dois JSONs do legado:
 | Topologia do Coolify (sem porta publicada) | API sobe em `producao`, nginx serve a SPA e repassa `/api` e `/readyz` pela rede interna |
 | Subida sem `ANTHROPIC_API_KEY` | API sobe com aviso; `/me` devolve `leitura_habilitada: false` e `POST /importacoes` responde 503 explicando — sem 500 nem tela quebrada |
 | Senha do banco com espaço, `@`, `/` e `#` | sobe normalmente: a API monta a DSN com percent-encoding a partir das partes |
+| `ADMIN_SENHA=123` (curta) | API sobe, sorteia senha forte, cria o admin e anuncia no log; login com essa senha devolve 200 e cookie `HttpOnly; Secure` |
 
 Três bugs foram encontrados e corrigidos nesse processo — todos invisíveis sem um
 Postgres de verdade:

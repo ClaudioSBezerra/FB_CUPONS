@@ -1,0 +1,71 @@
+# ============================================================
+# FB_CUPONS — Variáveis de Ambiente para Coolify (Produção)
+# Domínio: cupom.fbtax.cloud
+# Docker Compose Location: /docker-compose.coolify.yml
+# Domains: cupom.fbtax.cloud -> serviço "frontend", porta 80
+# ============================================================
+#
+# Cole este bloco em Environment Variables e substitua o que está em
+# MAIÚSCULAS. Não defina PORTA, AMBIENTE nem DATABASE_URL: o compose já
+# cuida dos três.
+
+# ── Banco de Dados (Postgres do próprio compose) ──────────
+# Dirige o contêiner do Postgres E a conexão da API. A senha pode ter
+# qualquer caractere, inclusive espaço e @ / : ? # — a API monta a conexão
+# com percent-encoding. Não use aspas em volta.
+#
+# ATENÇÃO: DB_PASSWORD só tem efeito na PRIMEIRA inicialização. Se o volume
+# já existe de um deploy anterior, trocar aqui NÃO muda a senha do banco —
+# o log vai acusar "password authentication failed". Nesse caso, apague o
+# volume (se não houver dados) ou rode no contêiner do Postgres:
+#   ALTER USER cupons WITH PASSWORD 'a-senha-nova';
+DB_NAME=cupons
+DB_USER=cupons
+DB_PASSWORD=SUBSTITUIR_openssl_rand_base64_24
+
+# ── Sessão — gere com: openssl rand -hex 64 ───────────────
+# Mínimo de 32 caracteres; a API recusa subir com menos.
+JWT_SECRET=SUBSTITUIR_openssl_rand_hex_64
+SESSAO_HORAS=12
+
+# ── Domínio ───────────────────────────────────────────────
+DOMINIO_URL=https://cupom.fbtax.cloud
+
+# ── Primeiro acesso ───────────────────────────────────────
+# Criados UMA ÚNICA VEZ, na primeira subida com a tabela de usuários vazia.
+# Trocar depois não altera o usuário existente.
+#
+# Se ADMIN_SENHA ficar vazia ou tiver menos de 8 caracteres, a API NÃO
+# falha: sorteia uma senha forte e a anuncia no log, no aviso
+# "administrador criado com SENHA SORTEADA".
+ADMIN_EMAIL=claudiosousadebezerra@gmail.com
+ADMIN_SENHA=SUBSTITUIR_minimo_8_caracteres
+
+# ── Leitura dos cupons via Claude (visão) ─────────────────
+# OPCIONAL. Sem a chave o sistema sobe e funciona, menos a aba Importar:
+# cadastros, revisão manual, cobrança e Excel seguem valendo.
+# A chave fica só no servidor — nunca vai ao frontend nem ao log.
+ANTHROPIC_API_KEY=
+
+# Modelo da leitura normal e do botão "reler com modelo mais forte".
+CLAUDE_MODEL=claude-opus-5
+CLAUDE_MODEL_FORTE=claude-fable-5
+
+# Esforço de raciocínio: low, medium, high, xhigh, max. Cupom apagado
+# melhora com esforço maior, e cada degrau custa mais.
+CLAUDE_ESFORCO=high
+CLAUDE_TIMEOUT_S=180
+
+# Páginas lidas em paralelo. Acima de 3 cresce o risco de 429 na API.
+LEITURA_CONCORRENCIA=3
+
+# Lado maior da imagem enviada à API. 1568 é o ponto em que a própria API
+# pararia de ganhar resolução. Use 0 para enviar sem redimensionar.
+LEITURA_LADO_MAX=1568
+
+# Teto de leituras por dia, para controle de custo. 0 desliga o limite.
+LIMITE_LEITURAS_DIA=200
+
+# ── Upload e PDF ──────────────────────────────────────────
+UPLOAD_MAX_MB=50
+PDF_DPI=300

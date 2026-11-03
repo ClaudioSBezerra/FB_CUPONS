@@ -91,7 +91,7 @@ func TestConferirDSN(t *testing.T) {
 			}
 			// A mensagem precisa dizer o que fazer, não só que falhou.
 			if c.erro && err != nil && strings.Contains(c.dsn, " ") {
-				if !strings.Contains(err.Error(), "DB_SENHA") {
+				if !strings.Contains(err.Error(), "DB_PASSWORD") {
 					t.Errorf("mensagem não aponta a saída: %v", err)
 				}
 			}
@@ -102,9 +102,9 @@ func TestConferirDSN(t *testing.T) {
 func TestCarregarMontaDSNDasPartes(t *testing.T) {
 	t.Setenv("DATABASE_URL", "")
 	t.Setenv("DB_HOST", "postgres")
-	t.Setenv("DB_USUARIO", "cupons")
-	t.Setenv("DB_SENHA", "senha com espaço e @")
-	t.Setenv("DB_NOME", "cupons")
+	t.Setenv("DB_USER", "cupons")
+	t.Setenv("DB_PASSWORD", "senha com espaço e @")
+	t.Setenv("DB_NAME", "cupons")
 	t.Setenv("JWT_SECRET", strings.Repeat("x", 32))
 
 	c, err := Carregar()
@@ -124,7 +124,7 @@ func TestCarregarMontaDSNDasPartes(t *testing.T) {
 func TestCarregarPrefereDATABASEURL(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://a:b@outro:5432/outro")
 	t.Setenv("DB_HOST", "postgres")
-	t.Setenv("DB_SENHA", "ignorada")
+	t.Setenv("DB_PASSWORD", "ignorada")
 	t.Setenv("JWT_SECRET", strings.Repeat("x", 32))
 
 	c, err := Carregar()
@@ -151,5 +151,116 @@ func TestLeituraHabilitada(t *testing.T) {
 	}
 	if !(Config{AnthropicAPIKey: "sk-ant-x"}).LeituraHabilitada() {
 		t.Error("com chave, a leitura está habilitada")
+	}
+}
+
+func TestCarregarAcumulaTodosOsProblemas(t *testing.T) {
+	// O ponto: um deploy deve revelar TUDO o que está errado, não um problema
+	// por reinício. Aqui faltam banco, JWT e CORS de produção ao mesmo tempo.
+	t.Setenv("DATABASE_URL", "")
+	t.Setenv("DB_PASSWORD", "")
+	t.Setenv("DB_HOST", "")
+	t.Setenv("JWT_SECRET", "")
+	t.Setenv("AMBIENTE", "producao")
+	t.Setenv("CORS_ORIGENS", "")
+
+	_, err := Carregar()
+	if err == nil {
+		t.Fatal("deveria recusar a configuração")
+	}
+	msg := err.Error()
+	for _, esperado := range []string{"3 problema(s)", "DB_PASSWORD", "JWT_SECRET", "CORS_ORIGENS", "1.", "2.", "3."} {
+		if !strings.Contains(msg, esperado) {
+			t.Errorf("mensagem não contém %q:\n%s", esperado, msg)
+		}
+	}
+}
+
+func TestSenhaDoBancoVaziaSoEhProblemaEmProducao(t *testing.T) {
+	// Em desenvolvimento, autenticação sem senha é legítima.
+	t.Setenv("DATABASE_URL", "")
+	t.Setenv("DB_PASSWORD", "")
+	t.Setenv("JWT_SECRET", strings.Repeat("x", 32))
+	t.Setenv("AMBIENTE", "desenvolvimento")
+
+	if _, err := Carregar(); err != nil {
+		t.Errorf("em desenvolvimento, senha de banco vazia não deveria impedir: %v", err)
+	}
+
+	t.Setenv("AMBIENTE", "producao")
+	t.Setenv("CORS_ORIGENS", "https://cupom.fbtax.cloud")
+	_, err := Carregar()
+	if err == nil {
+		t.Fatal("em produção, DB_PASSWORD vazia deveria ser apontada")
+	}
+	if !strings.Contains(err.Error(), "DB_PASSWORD") {
+		t.Errorf("mensagem não aponta DB_PASSWORD: %v", err)
+	}
+}
+
+func TestSenhaAdminNaoImpedeASubida(t *testing.T) {
+	// Senha de bootstrap curta é problema de conveniência, não de serviço:
+	// a API tem de subir e o cmd/api sorteia uma senha.
+	t.Setenv("DATABASE_URL", "postgres://u:p@host:5432/db")
+	t.Setenv("JWT_SECRET", strings.Repeat("x", 32))
+	t.Setenv("ADMIN_EMAIL", "alguem@exemplo.com")
+	t.Setenv("ADMIN_SENHA", "123")
+
+	c, err := Carregar()
+	if err != nil {
+		t.Fatalf("senha de admin curta não deveria impedir a subida: %v", err)
+	}
+	if c.SenhaAdminUtilizavel() {
+		t.Error("senha de 3 caracteres não deveria ser considerada utilizável")
+	}
+
+	t.Setenv("ADMIN_SENHA", "senhaforte123")
+	c, err = Carregar()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !c.SenhaAdminUtilizavel() {
+		t.Error("senha de 13 caracteres deveria ser utilizável")
+	}
+}
+
+func TestAmbienteAceitaENVIRONMENT(t *testing.T) {
+	// Os outros projetos FB usam ENVIRONMENT=production.
+	t.Setenv("DATABASE_URL", "postgres://u:p@host:5432/db")
+	t.Setenv("JWT_SECRET", strings.Repeat("x", 32))
+	t.Setenv("CORS_ORIGENS", "https://cupom.fbtax.cloud")
+	t.Setenv("AMBIENTE", "")
+	t.Setenv("ENVIRONMENT", "production")
+
+	c, err := Carregar()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !c.Producao() {
+		t.Errorf("ENVIRONMENT=production deveria dar produção, veio %q", c.Ambiente)
+	}
+
+	// AMBIENTE explícito tem precedência.
+	t.Setenv("AMBIENTE", "desenvolvimento")
+	c, err = Carregar()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Producao() {
+		t.Error("AMBIENTE explícito deveria ter precedência sobre ENVIRONMENT")
+	}
+}
+
+func TestJWTSecretCurtoEhFatal(t *testing.T) {
+	// Este sim é impedimento real: chave curta é sessão forjável.
+	t.Setenv("DATABASE_URL", "postgres://u:p@host:5432/db")
+	t.Setenv("JWT_SECRET", strings.Repeat("x", 31))
+
+	_, err := Carregar()
+	if err == nil {
+		t.Fatal("JWT_SECRET de 31 caracteres deveria ser recusada")
+	}
+	if !strings.Contains(err.Error(), "openssl rand") {
+		t.Errorf("a mensagem deveria ensinar a gerar a chave: %v", err)
 	}
 }
