@@ -118,6 +118,14 @@ services:
     restart: unless-stopped
     depends_on:
       - api
+    networks:
+      # A rede do próprio projeto, para alcançar a API.
+      - default
+      # A rede do proxy do Coolify. SEM isto o Traefik casa o roteador mas não
+      # alcança o contêiner, e a resposta é "503 no available server" — o
+      # roteador existe, o backend não é visível. É o mesmo arranjo que o
+      # FB_FAROL usa neste servidor.
+      - coolify
     # O domínio é atribuído SOMENTE pela aba Domains do painel, apontando
     # para este serviço. Não use a variável mágica SERVICE_FQDN_*: ela mexe no
     # mesmo roteador do Traefik e os dois mecanismos juntos produzem regra
@@ -132,6 +140,15 @@ services:
     # que não casa com nenhuma requisição — o sintoma é 404 do Traefik mesmo
     # com o Host certo. Sem o esquema também não nasce roteador https, e por
     # consequência nenhum certificado.
+
+networks:
+  # Rede interna do projeto: postgres, api e frontend conversam aqui.
+  default:
+
+  # Criada pelo Coolify na instalação; é onde o Traefik vive. Só o frontend
+  # entra nela — postgres e api permanecem inalcançáveis de fora.
+  coolify:
+    external: true
 
 volumes:
   postgres-dados:

@@ -130,6 +130,23 @@ Não use o `docker-compose.prod.yml` aqui: o Caddy dele disputaria as portas
 >   --format '{{json .Config.Labels}}' | tr ',' '\n' | grep -i traefik
 > ```
 
+> **`503 no available server` é outro problema, não o mesmo.** 404 significa que
+> nenhum roteador casou com o host; 503 com esse corpo significa que o roteador
+> casou mas o Traefik não alcança o contêiner. Por isso o serviço `frontend`
+> entra explicitamente na rede externa `coolify`, onde o proxy vive — o mesmo
+> arranjo do FB_FAROL neste servidor. Conferir com:
+>
+> ```bash
+> docker inspect $(docker ps -qf name=frontend-<uuid>) \
+>   --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}'
+> ```
+>
+> Tem de listar `coolify`. `api` e `postgres` ficam só na rede do projeto, de
+> propósito: nada além do frontend é alcançável de fora.
+
+> **Túnel do Cloudflare não é necessário.** O VPS tem IP público com 80 e 443
+> abertas. Túnel serve para origem sem IP alcançável.
+
 #### O que impede a API de subir, e o que só avisa
 
 Só duas coisas são fatais, porque sem elas a API não tem como servir:
