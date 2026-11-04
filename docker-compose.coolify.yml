@@ -26,9 +26,9 @@
 #      (o padrão é /docker-compose.yml, que é o de DESENVOLVIMENTO e publica
 #      porta no host — foi o que causou "port is already allocated")
 #   3. Em Environment Variables, defina os segredos (lista abaixo)
-#   4. Em Domains, no serviço "frontend", informe COM esquema:
-#      https://cupom.fbtax.cloud
-#      (a porta 80 é o padrão; o serviço "api" NÃO recebe domínio)
+#   4. Em Environment Variables, acrescente CLOUDFLARE_TUNNEL_TOKEN (ver
+#      abaixo, no serviço cloudflared). O campo Domains é irrelevante aqui:
+#      quem entrega o tráfego é o túnel, não o proxy do Coolify.
 #   5. Deploy
 #
 # Variáveis do painel: copie o bloco de coolify-env-template.txt.
@@ -118,14 +118,6 @@ services:
     restart: unless-stopped
     depends_on:
       - api
-    networks:
-      # A rede do próprio projeto, para alcançar a API.
-      - default
-      # A rede do proxy do Coolify. SEM isto o Traefik casa o roteador mas não
-      # alcança o contêiner, e a resposta é "503 no available server" — o
-      # roteador existe, o backend não é visível. É o mesmo arranjo que o
-      # FB_FAROL usa neste servidor.
-      - coolify
     # O domínio é atribuído SOMENTE pela aba Domains do painel, apontando
     # para este serviço. Não use a variável mágica SERVICE_FQDN_*: ela mexe no
     # mesmo roteador do Traefik e os dois mecanismos juntos produzem regra
@@ -141,14 +133,28 @@ services:
     # com o Host certo. Sem o esquema também não nasce roteador https, e por
     # consequência nenhum certificado.
 
-networks:
-  # Rede interna do projeto: postgres, api e frontend conversam aqui.
-  default:
-
-  # Criada pelo Coolify na instalação; é onde o Traefik vive. Só o frontend
-  # entra nela — postgres e api permanecem inalcançáveis de fora.
-  coolify:
-    external: true
+  # O tráfego entra por Cloudflare Tunnel, não pelo proxy do Coolify.
+  #
+  # Por que: neste servidor o Coolify gera rótulos de Traefik malformados —
+  #   rule: Host(``) && PathPrefix(`dominio`)
+  # com host vazio — em TODOS os recursos, inclusive nos que funcionam. O que
+  # faz os outros funcionarem é o túnel, e é o padrão de FB_SMARTPICK,
+  # FB_FAROL, FB_APU02/04/05, FB_AUDITORIA e STOCKFLOW aqui.
+  #
+  # O cloudflared fica na rede interna e alcança o frontend pelo nome do
+  # serviço. O mapeamento hostname -> serviço vive no painel da Cloudflare
+  # (Zero Trust -> Networks -> Tunnels -> Public Hostname):
+  #
+  #     cupom.fbtax.cloud  ->  http://frontend:80
+  #
+  # O túnel também cria e mantém o registro DNS, então não é preciso registro
+  # A manual — e, se existir um, ele deve ser removido para não disputar.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN:?defina CLOUDFLARE_TUNNEL_TOKEN no painel do Coolify}
+    depends_on:
+      - frontend
 
 volumes:
   postgres-dados:

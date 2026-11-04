@@ -2,12 +2,9 @@
 # FB_CUPONS — Variáveis de Ambiente para Coolify (Produção)
 # Domínio: cupom.fbtax.cloud
 # Docker Compose Location: /docker-compose.coolify.yml
-# Domains: no serviço "frontend", informe COM o esquema:
-#              https://cupom.fbtax.cloud
-#          O serviço "api" NÃO recebe domínio — o nginx do frontend repassa
-#          /api pela rede interna.
-#          Sem o "https://" o Coolify trata o valor como caminho e gera
-#          rule: Host(``) && PathPrefix(`cupom.fbtax.cloud`), que dá 404.
+# Entrada de tráfego: Cloudflare Tunnel (igual a FB_SMARTPICK e FB_FAROL
+#          neste servidor). O campo Domains do Coolify é irrelevante — neste
+#          servidor o Traefik recebe rótulo malformado em todos os recursos.
 # ============================================================
 #
 # Cole este bloco em Environment Variables e substitua o que está em
@@ -27,6 +24,17 @@
 DB_NAME=cupons
 DB_USER=cupons
 DB_PASSWORD=SUBSTITUIR_openssl_rand_base64_24
+
+# ── Cloudflare Tunnel ─────────────────────────────────────
+# Em dash.cloudflare.com -> Zero Trust -> Networks -> Tunnels:
+#   1. Create a tunnel (tipo Cloudflared), dê o nome fb-cupons
+#   2. Copie o token que aparece no comando de instalação
+#   3. Em Public Hostname, adicione:
+#        Subdomain: cupom      Domain: fbtax.cloud
+#        Service:   HTTP       URL:    frontend:80
+#   O túnel cria o registro DNS sozinho. Se já existir um registro A manual
+#   para "cupom", apague — os dois disputariam o mesmo nome.
+CLOUDFLARE_TUNNEL_TOKEN=SUBSTITUIR_TOKEN_DO_TUNEL
 
 # ── Sessão — gere com: openssl rand -hex 64 ───────────────
 # Mínimo de 32 caracteres; a API recusa subir com menos.

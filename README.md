@@ -130,22 +130,28 @@ Não use o `docker-compose.prod.yml` aqui: o Caddy dele disputaria as portas
 >   --format '{{json .Config.Labels}}' | tr ',' '\n' | grep -i traefik
 > ```
 
-> **`503 no available server` é outro problema, não o mesmo.** 404 significa que
-> nenhum roteador casou com o host; 503 com esse corpo significa que o roteador
-> casou mas o Traefik não alcança o contêiner. Por isso o serviço `frontend`
-> entra explicitamente na rede externa `coolify`, onde o proxy vive — o mesmo
-> arranjo do FB_FAROL neste servidor. Conferir com:
+> **`503 no available server` vindo do Traefik não se resolve mexendo em rede.**
+> O frontend e o `coolify-proxy` já compartilham a rede do recurso — o Coolify
+> conecta o proxy sozinho. O 503 vem do rótulo com host vazio, e a saída é não
+> depender do Traefik: o túnel entrega direto no contêiner.
+
+> **O tráfego entra por Cloudflare Tunnel, não pelo proxy do Coolify.** Neste
+> servidor o Coolify gera rótulos de Traefik malformados — host vazio e o
+> domínio como *caminho*:
 >
-> ```bash
-> docker inspect $(docker ps -qf name=frontend-<uuid>) \
->   --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}'
+> ```
+> rule: Host(``) && PathPrefix(`cupom.fbtax.cloud`)
 > ```
 >
-> Tem de listar `coolify`. `api` e `postgres` ficam só na rede do projeto, de
-> propósito: nada além do frontend é alcançável de fora.
-
-> **Túnel do Cloudflare não é necessário.** O VPS tem IP público com 80 e 443
-> abertas. Túnel serve para origem sem IP alcançável.
+> E isso vale para **todos** os recursos, inclusive os que funcionam: o
+> `smartpick.fbtax.cloud` tem exatamente o mesmo rótulo defeituoso e responde
+> 200. O que o faz funcionar é o `cloudflared`. Sete recursos deste servidor
+> usam túnel (FB_SMARTPICK, FB_FAROL, FB_APU02/04/05, FB_AUDITORIA, STOCKFLOW),
+> e é o padrão que este projeto segue.
+>
+> Consequências práticas: o campo **Domains** do Coolify é irrelevante, e o
+> registro DNS é criado e mantido pelo próprio túnel — registro A manual deve
+> ser removido para não disputar o nome.
 
 #### O que impede a API de subir, e o que só avisa
 
