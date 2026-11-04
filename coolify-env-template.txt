@@ -79,6 +79,15 @@ LEITURA_LADO_MAX=1568
 # Teto de leituras por dia, para controle de custo. 0 desliga o limite.
 LIMITE_LEITURAS_DIA=200
 
+# ── NÃO defina estas ──────────────────────────────────────
+# VITE_API_URL  — a aplicação chama /api na mesma origem. Se existir no
+#                 painel, o Coolify a injeta como build-arg e ela pode ser
+#                 embutida no JS; um "http://localhost:8080" ali faz o
+#                 navegador de quem acessa falhar com "Failed to fetch".
+#                 Se estiver definida, APAGUE.
+# DATABASE_URL, PORTA, AMBIENTE, SERVICE_FQDN_*, SERVICE_URL_*, POSTGRES_*
+#               — o compose já resolve todas.
+
 # ── Upload e PDF ──────────────────────────────────────────
 UPLOAD_MAX_MB=50
 PDF_DPI=300

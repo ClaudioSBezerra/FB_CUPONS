@@ -80,10 +80,6 @@ services:
   frontend:
     build:
       context: ./frontend
-      args:
-        # Vazio = mesma origem, em /api: o nginx do contêiner repassa para a
-        # API. Mesmo comportamento da produção.
-        VITE_API_URL: ${VITE_API_URL-}
     restart: unless-stopped
     depends_on:
       - api

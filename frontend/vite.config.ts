@@ -9,7 +9,9 @@ export default defineConfig({
     // sessão ser first-party também aqui — igual à produção.
     proxy: {
       "/api": {
-        target: process.env.VITE_API_URL || "http://localhost:8080",
+        // Só no servidor de desenvolvimento do vite. O build nunca embute
+        // endereço: em contêiner o nginx é que repassa /api.
+        target: process.env.API_DEV_URL || "http://localhost:8080",
         changeOrigin: true,
       },
     },

@@ -1,13 +1,4 @@
 /// <reference types="vite/client" />
 
-interface ImportMetaEnv {
-  /**
-   * URL base da API. Vazio significa "mesmo domínio, em /api" — é o que a
-   * produção usa, para o cookie de sessão ser first-party.
-   */
-  readonly VITE_API_URL?: string;
-}
-
-interface ImportMeta {
-  readonly env: ImportMetaEnv;
-}
+// A aplicação não lê nenhuma variável VITE_*: a API é sempre na mesma origem,
+// em /api. Ver o comentário em src/api.ts.

@@ -96,6 +96,14 @@ Nos três, o navegador fala só com o frontend: o nginx dele serve a SPA e repas
 `/api` para a API pela rede interna. Um caminho só, cookie de sessão first-party
 e sem CORS.
 
+> **A aplicação não tem URL de API configurável, de propósito.** Ela chama
+> `/api` na mesma origem, sempre. Uma URL absoluta embutida em tempo de build
+> viaja dentro do JS, e se estiver errada o navegador de *quem acessa* tenta
+> falar com outro endereço. Foi o que aconteceu: o Coolify injeta toda variável
+> do painel como `--build-arg`, um `VITE_API_URL=http://localhost:8080` entrou
+> no bundle e o site subiu com `Failed to fetch` em todas as chamadas. Se essa
+> variável existir no painel, apague — hoje ela é inerte, mas confunde.
+
 ### No Coolify
 
 Não use o `docker-compose.prod.yml` aqui: o Caddy dele disputaria as portas
@@ -330,6 +338,7 @@ Executado com `docker compose up` e os dois JSONs do legado:
 | Subida sem `ANTHROPIC_API_KEY` | API sobe com aviso; `/me` devolve `leitura_habilitada: false` e `POST /importacoes` responde 503 explicando — sem 500 nem tela quebrada |
 | Senha do banco com espaço, `@`, `/` e `#` | sobe normalmente: a API monta a DSN com percent-encoding a partir das partes |
 | `ADMIN_SENHA=123` (curta) | API sobe, sorteia senha forte, cria o admin e anuncia no log; login com essa senha devolve 200 e cookie `HttpOnly; Secure` |
+| Bundle sem endereço absoluto | `grep` no JS gerado só acha `w3.org` (namespace de SVG) e `reactjs.org` (mensagem de erro) |
 | Ensaio completo em modo `producao` | login, importação dos dois JSONs, reimportação sem duplicar (12 ignorados, 5 pendentes atualizados), cobrança e download do Excel — tudo pela rede interna, com `Authorization: Bearer` no lugar do cookie `Secure` |
 
 **Nota sobre a única diferença de valor:** o xlsx do protótipo traz

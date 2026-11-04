@@ -3,7 +3,18 @@
 // A sessão é um cookie httpOnly, então toda requisição vai com
 // credentials: "include" e nenhum token encosta em JavaScript.
 
-const BASE = import.meta.env.VITE_API_URL ?? "";
+// A API é SEMPRE na mesma origem, em /api.
+//
+// Não há URL configurável de propósito. Uma URL absoluta embutida em tempo de
+// build é uma armadilha: o valor viaja dentro do JS e, se estiver errado, o
+// navegador de quem acessa tenta falar com outro endereço — foi assim que um
+// "http://localhost:8080" vazou para produção e todo fetch falhou.
+//
+// Nos três modos de execução o caminho /api já chega na API:
+//   * npm run dev  -> o proxy do vite.config.ts encaminha
+//   * contêiner    -> o nginx do frontend repassa
+//   * produção     -> idem, e o cookie de sessão fica first-party
+const BASE = "";
 
 export type Status = "pendente" | "confirmado" | "rejeitado";
 export type Unidade = "UND" | "KG";

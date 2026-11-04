@@ -11,9 +11,9 @@ RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
 COPY . .
 
-# VITE_API_URL vazio = a API está no mesmo domínio, em /api (produção).
-ARG VITE_API_URL=""
-ENV VITE_API_URL=$VITE_API_URL
+# Nenhuma variável VITE_* entra aqui de propósito: a aplicação chama /api na
+# mesma origem, e o nginx desta imagem repassa. Um endereço absoluto embutido
+# no build viajaria dentro do JS e quebraria o site de quem acessa.
 
 RUN npm run build
 
