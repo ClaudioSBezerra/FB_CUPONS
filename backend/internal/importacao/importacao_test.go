@@ -11,7 +11,9 @@ import (
 	"io"
 	"log/slog"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/ClaudioSBezerra/FB_CUPONS/backend/internal/dominio"
 	"github.com/ClaudioSBezerra/FB_CUPONS/backend/internal/imagem"
@@ -34,6 +36,8 @@ type storeFake struct {
 	garantidos   []string
 	leiturasHoje int
 	importacoes  []store.Importacao
+	progressos   []store.Importacao
+	mu           sync.Mutex
 }
 
 func novoStoreFake() *storeFake {
@@ -81,6 +85,15 @@ func (s *storeFake) CriarImportacao(_ context.Context, arquivos []string, total 
 	s.importacoes = append(s.importacoes, store.Importacao{ID: int64(len(s.importacoes) + 1),
 		Arquivos: arquivos, TotalPaginas: total})
 	return int64(len(s.importacoes)), nil
+}
+
+// progressos guarda cada atualização parcial, para o teste conferir que o
+// lote publica andamento em vez de ficar silencioso por minutos.
+func (s *storeFake) AtualizarProgressoImportacao(_ context.Context, imp store.Importacao) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.progressos = append(s.progressos, imp)
+	return nil
 }
 
 func (s *storeFake) FinalizarImportacao(_ context.Context, imp store.Importacao) error {
@@ -513,5 +526,91 @@ func TestLimiteDiarioVaiParaOLog(t *testing.T) {
 	}
 	if !cap.contem("limite diário") {
 		t.Errorf("o log não explicou o bloqueio.\nlog: %v", cap.linhas)
+	}
+}
+
+func TestEmSegundoPlanoRespondeNaHoraEProcessaDepois(t *testing.T) {
+	// O ponto: a resposta sai antes da leitura terminar. A importação síncrona
+	// não sobrevivia ao corte de ~100s do proxy da Cloudflare, e um lote
+	// inteiro morria com "context canceled" depois de já ter gasto as
+	// chamadas pagas.
+	st := novoStoreFake()
+	leitor := leitura.NovoLeitorGravado(
+		respostaCupom("1340923", "37678845000736", "MATERNIDADE CÉLIA CÂMARA", 285.00,
+			itemPaoFrances+","+itemPaoDoce),
+		respostaCupom("1341234", "37678845000736", "MATERNIDADE CÉLIA CÂMARA", 120.00, itemPaoFrances),
+	)
+	svc := NovoServico(st, leitor, logSilencioso())
+
+	doc := pdfDeTeste(t, [][]byte{jpegCupom(t, 30), jpegCupom(t, 200)})
+
+	// Contexto que é cancelado logo depois, imitando a requisição HTTP sendo
+	// cortada pelo proxy. O lote tem de seguir mesmo assim.
+	ctx, cancelar := context.WithCancel(context.Background())
+	imp, err := svc.EmSegundoPlano(ctx, []Arquivo{{Nome: "cupons.pdf", Dados: doc}}, nil, "2026-10")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cancelar()
+
+	if imp.ID == 0 {
+		t.Error("a resposta deveria trazer o id do lote")
+	}
+	if imp.Status != "processando" {
+		t.Errorf("status = %q, quer processando", imp.Status)
+	}
+
+	// Espera o trabalho de fundo terminar.
+	prazo := time.Now().Add(10 * time.Second)
+	for time.Now().Before(prazo) {
+		st.mu.Lock()
+		pronto := len(st.cuponsSalvos) == 2
+		st.mu.Unlock()
+		if pronto {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	if len(st.cuponsSalvos) != 2 {
+		t.Fatalf("cupons salvos = %d, quer 2 — o cancelamento da requisição derrubou o lote",
+			len(st.cuponsSalvos))
+	}
+	if len(st.progressos) == 0 {
+		t.Error("o lote não publicou progresso nenhum")
+	}
+	// A última atualização tem de refletir as duas páginas lidas.
+	ultimo := st.importacoes[len(st.importacoes)-1]
+	if ultimo.Lidas != 2 || ultimo.TotalPaginas != 2 {
+		t.Errorf("resultado final = %d lidas de %d páginas, quer 2 de 2",
+			ultimo.Lidas, ultimo.TotalPaginas)
+	}
+}
+
+func TestProgressoEhPublicadoPaginaAPagina(t *testing.T) {
+	st := novoStoreFake()
+	leitor := leitura.NovoLeitorGravado(
+		respostaCupom("1", "37678845000736", "MATERNIDADE CÉLIA CÂMARA", 120.00, itemPaoFrances),
+		respostaCupom("2", "37678845000736", "MATERNIDADE CÉLIA CÂMARA", 120.00, itemPaoFrances),
+		respostaCupom("3", "37678845000736", "MATERNIDADE CÉLIA CÂMARA", 120.00, itemPaoFrances),
+	)
+	svc := NovoServico(st, leitor, logSilencioso())
+
+	doc := pdfDeTeste(t, [][]byte{jpegCupom(t, 20), jpegCupom(t, 120), jpegCupom(t, 220)})
+	if _, err := svc.Importar(context.Background(),
+		[]Arquivo{{Nome: "tres.pdf", Dados: doc}}, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	// Uma atualização com o total + uma por página concluída.
+	if len(st.progressos) < 4 {
+		t.Errorf("progressos = %d, quer ao menos 4 (total + 3 páginas)", len(st.progressos))
+	}
+	if st.progressos[0].TotalPaginas != 3 {
+		t.Errorf("a primeira atualização deveria trazer o total: %+v", st.progressos[0])
 	}
 }

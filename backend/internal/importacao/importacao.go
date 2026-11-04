@@ -10,6 +10,8 @@ import (
 	"log/slog"
 	"sync"
 
+	"time"
+
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ClaudioSBezerra/FB_CUPONS/backend/internal/dominio"
@@ -51,6 +53,7 @@ type Store interface {
 	ConteudoFoto(ctx context.Context, id int64) (mime string, dados []byte, err error)
 	CriarImportacao(ctx context.Context, arquivos []string, totalPaginas int, usuarioID *int64) (int64, error)
 	FinalizarImportacao(ctx context.Context, imp store.Importacao) error
+	AtualizarProgressoImportacao(ctx context.Context, imp store.Importacao) error
 	SalvarCupom(ctx context.Context, c dominio.Cupom, importacaoID *int64) (store.ResultadoGravacao, error)
 	RegistrarLeitura(ctx context.Context, r store.RegistroLeitura) error
 	LeiturasHoje(ctx context.Context) (int, error)
@@ -83,30 +86,96 @@ type pagina struct {
 	erro error
 }
 
+// EmSegundoPlano abre o lote, devolve o registro imediatamente e processa as
+// páginas depois, destacado da requisição HTTP.
+//
+// Existe porque a importação síncrona não sobrevive ao caminho de rede: ler
+// 18 páginas pela API de visão leva minutos, e o proxy da Cloudflare corta a
+// requisição por volta de 100 segundos. Quando ele corta, o contexto da
+// requisição é cancelado e TODAS as leituras em andamento morrem com
+// "context canceled" — foi exatamente o que aconteceu no primeiro lote real.
+//
+// Quem chama responde 202 com o id, e a tela acompanha por
+// GET /api/importacoes/{id}.
+func (s *Servico) EmSegundoPlano(ctx context.Context, arquivos []Arquivo, usuarioID *int64, mes string) (store.Importacao, error) {
+	if len(arquivos) == 0 {
+		return store.Importacao{}, fmt.Errorf("nenhum arquivo foi enviado")
+	}
+
+	nomes := make([]string, 0, len(arquivos))
+	for _, a := range arquivos {
+		nomes = append(nomes, a.Nome)
+	}
+
+	// O registro nasce antes de qualquer trabalho pesado, para a resposta
+	// sair em milissegundos. total_paginas = 0 significa "ainda fatiando".
+	impID, err := s.store.CriarImportacao(ctx, nomes, 0, usuarioID)
+	if err != nil {
+		return store.Importacao{}, err
+	}
+
+	svc := s
+	if mes != "" {
+		copia := *s
+		copia.MesReferencia = mes
+		svc = &copia
+	}
+
+	// context.WithoutCancel desliga o cancelamento da requisição mas preserva
+	// os valores do contexto. O prazo é generoso: um PDF de 50 páginas em
+	// concorrência 3 pode levar bem mais que o timeout do HTTP.
+	go func() {
+		ctxFundo, cancelar := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Hour)
+		defer cancelar()
+		svc.processarLote(ctxFundo, impID, nomes, arquivos)
+	}()
+
+	return store.Importacao{
+		ID: impID, Arquivos: nomes, Status: "processando",
+		Detalhe: []store.DetalhePagina{},
+	}, nil
+}
+
 // Importar processa o lote inteiro e devolve o resumo.
 func (s *Servico) Importar(ctx context.Context, arquivos []Arquivo, usuarioID *int64) (store.Importacao, error) {
 	if len(arquivos) == 0 {
 		return store.Importacao{}, fmt.Errorf("nenhum arquivo foi enviado")
 	}
 
-	// 1. Fatia tudo em páginas antes de chamar a API: se um PDF estiver
-	//    corrompido, o operador descobre sem gastar leitura.
-	var paginas []pagina
 	nomes := make([]string, 0, len(arquivos))
 	for _, a := range arquivos {
 		nomes = append(nomes, a.Nome)
-		paginas = append(paginas, s.fatiar(ctx, a)...)
 	}
 
-	impID, err := s.store.CriarImportacao(ctx, nomes, len(paginas), usuarioID)
+	impID, err := s.store.CriarImportacao(ctx, nomes, 0, usuarioID)
 	if err != nil {
 		return store.Importacao{}, err
 	}
+	return s.processarLote(ctx, impID, nomes, arquivos), nil
+}
+
+// processarLote faz o trabalho: fatia os arquivos, lê cada página e consolida.
+// Nunca devolve erro — uma página que falha vira linha de erro no detalhe, e o
+// lote segue. Falha total é refletida em Status.
+func (s *Servico) processarLote(ctx context.Context, impID int64, nomes []string, arquivos []Arquivo) store.Importacao {
+	imp := store.Importacao{ID: impID, Arquivos: nomes, Status: "concluida"}
+
+	// 1. Fatia tudo em páginas antes de chamar a API: se um PDF estiver
+	//    corrompido, o operador descobre sem gastar leitura.
+	var paginas []pagina
+	for _, a := range arquivos {
+		paginas = append(paginas, s.fatiar(ctx, a)...)
+	}
+	imp.TotalPaginas = len(paginas)
 
 	s.log.Info("importação iniciada",
 		"importacao", impID, "arquivos", len(arquivos), "paginas", len(paginas),
 		"mes_referencia", s.MesReferencia, "concorrencia", s.Concorrencia)
-	imp := store.Importacao{ID: impID, Arquivos: nomes, TotalPaginas: len(paginas), Status: "concluida"}
+
+	// O total já vale para a tela mostrar a barra de progresso.
+	if err := s.store.AtualizarProgressoImportacao(ctx, imp); err != nil {
+		s.log.Warn("não foi possível gravar o total de páginas", "importacao", impID, "erro", err)
+	}
 
 	// 2. Limite diário de custo: barra o lote antes de começar.
 	if s.LimiteDiario > 0 {
@@ -124,10 +193,8 @@ func (s *Servico) Importar(ctx context.Context, arquivos []Arquivo, usuarioID *i
 			s.log.Error("importação barrada pelo limite diário de leituras",
 				"importacao", impID, "limite", s.LimiteDiario, "usadas_hoje", usadas,
 				"paginas_do_lote", len(paginas))
-			if err := s.store.FinalizarImportacao(ctx, imp); err != nil {
-				return imp, err
-			}
-			return imp, nil
+			s.finalizar(ctx, imp)
+			return imp
 		}
 	}
 
@@ -135,44 +202,48 @@ func (s *Servico) Importar(ctx context.Context, arquivos []Arquivo, usuarioID *i
 	//    páginas, o que mantém o cache de prompt válido no lote inteiro.
 	ref, ctxValidacao, err := s.contexto(ctx)
 	if err != nil {
-		return store.Importacao{}, err
+		imp.Status = "falhou"
+		imp.Erros = 1
+		imp.Detalhe = []store.DetalhePagina{{Situacao: "erro",
+			Erro: fmt.Sprintf("não foi possível carregar catálogo e clientes: %v", err)}}
+		s.log.Error("importação não pôde carregar o contexto de validação",
+			"importacao", impID, "erro", err)
+		s.finalizar(ctx, imp)
+		return imp
 	}
 
-	// 4. Lê as páginas com concorrência limitada.
+	// 4. Lê as páginas com concorrência limitada, publicando o progresso.
 	detalhes := make([]store.DetalhePagina, len(paginas))
-	grupo, ctxGrupo := errgroup.WithContext(ctx)
+	grupo := new(errgroup.Group)
 	grupo.SetLimit(max(s.Concorrencia, 1))
 
 	var mu sync.Mutex
+	concluidas := 0
 	for i := range paginas {
-		i := i
 		grupo.Go(func() error {
-			d := s.processar(ctxGrupo, paginas[i], impID, ref, ctxValidacao)
+			d := s.processar(ctx, paginas[i], impID, ref, ctxValidacao)
 			mu.Lock()
 			detalhes[i] = d
+			concluidas++
+			parcial := imp
+			parcial.Detalhe = append([]store.DetalhePagina(nil), detalhes...)
+			parcial.Lidas, parcial.ComPendencia, parcial.Duplicadas, parcial.Erros = contar(detalhes)
 			mu.Unlock()
+
+			// Progresso a cada página: a tela mostra o lote andando em vez de
+			// ficar minutos sem sinal.
+			if err := s.store.AtualizarProgressoImportacao(ctx, parcial); err != nil {
+				s.log.Warn("não foi possível gravar o progresso",
+					"importacao", impID, "erro", err)
+			}
 			return nil // uma página com erro não derruba o lote
 		})
 	}
-	if err := grupo.Wait(); err != nil {
-		return store.Importacao{}, err
-	}
+	_ = grupo.Wait()
 
 	// 5. Consolida.
 	imp.Detalhe = detalhes
-	for _, d := range detalhes {
-		switch d.Situacao {
-		case "lido":
-			imp.Lidas++
-			if len(d.Avisos) > 0 {
-				imp.ComPendencia++
-			}
-		case "duplicado":
-			imp.Duplicadas++
-		case "erro":
-			imp.Erros++
-		}
-	}
+	imp.Lidas, imp.ComPendencia, imp.Duplicadas, imp.Erros = contar(detalhes)
 	if imp.Lidas == 0 && imp.Erros > 0 {
 		imp.Status = "falhou"
 	}
@@ -186,10 +257,33 @@ func (s *Servico) Importar(ctx context.Context, arquivos []Arquivo, usuarioID *i
 		"lidas", imp.Lidas, "com_pendencia", imp.ComPendencia,
 		"duplicadas", imp.Duplicadas, "erros", imp.Erros)
 
-	if err := s.store.FinalizarImportacao(ctx, imp); err != nil {
-		return imp, err
+	s.finalizar(ctx, imp)
+	return imp
+}
+
+// contar resume as situações das páginas.
+func contar(detalhes []store.DetalhePagina) (lidas, comPendencia, duplicadas, erros int) {
+	for _, d := range detalhes {
+		switch d.Situacao {
+		case "lido":
+			lidas++
+			if len(d.Avisos) > 0 {
+				comPendencia++
+			}
+		case "duplicado":
+			duplicadas++
+		case "erro":
+			erros++
+		}
 	}
-	return imp, nil
+	return
+}
+
+func (s *Servico) finalizar(ctx context.Context, imp store.Importacao) {
+	if err := s.store.FinalizarImportacao(ctx, imp); err != nil {
+		s.log.Error("não foi possível gravar o resultado da importação",
+			"importacao", imp.ID, "erro", err)
+	}
 }
 
 // contexto monta as referências do prompt e o contexto de validação.
@@ -366,13 +460,12 @@ func ehNaoEncontrado(err error) bool {
 	return errors.Is(err, store.ErroNaoEncontrado)
 }
 
-// ImportarComMes é o Importar com o mês de referência do lote, usado para
-// detectar ano/mês lido errado.
+// ImportarComMes processa o lote de forma síncrona, com o mês de referência.
+// Usado pelos testes; a API usa EmSegundoPlano.
 func (s *Servico) ImportarComMes(ctx context.Context, arquivos []Arquivo, usuarioID *int64, mes string) (store.Importacao, error) {
 	if mes == "" {
 		return s.Importar(ctx, arquivos, usuarioID)
 	}
-	// Cópia rasa: o mês vale só para este lote, sem afetar chamadas paralelas.
 	copia := *s
 	copia.MesReferencia = mes
 	return copia.Importar(ctx, arquivos, usuarioID)

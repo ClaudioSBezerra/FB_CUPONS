@@ -294,6 +294,32 @@ curl -b cookies.txt -F arquivos=@legado/cupons-outubro-2026-itens.json \
 A agregação da aba *Cobrança* do xlsx de referência foi reproduzida a partir dos dois JSONs:
 31 chaves (cliente + produto + unidade), idênticas em quantidade, nº de cupons e valor.
 
+## A importação é assíncrona
+
+`POST /api/importacoes` responde **202** com o id do lote e a leitura segue no
+servidor. A tela acompanha por `GET /api/importacoes/{id}`, que publica
+progresso página a página.
+
+Não é preferência de arquitetura, é necessidade: ler 18 páginas pela API de
+visão leva minutos, e o proxy da Cloudflare corta a requisição por volta de
+**100 segundos**. Quando cortava, o contexto da requisição era cancelado e
+**todas** as leituras em andamento morriam com `context canceled` — um lote
+inteiro perdido depois de já ter gasto as chamadas pagas. O trabalho de fundo
+usa `context.WithoutCancel`, então o cancelamento do HTTP não o alcança.
+
+Efeito colateral útil: dá para fechar a aba durante a leitura.
+
+## Zerar o movimento para testar
+
+`POST /api/admin/zerar-movimento` com `{"confirmacao":"APAGAR"}`, restrito a
+admin, ou o botão em **Cadastros**. Apaga cupons, itens, fotos, importações e o
+log de leituras; **preserva** clientes, produtos (inclusive os "a confirmar") e
+usuários.
+
+As fotos entram na limpeza de propósito: a importação deduplica imagens por
+SHA-256, então sem removê-las o mesmo PDF seria recusado como "já importada" e
+o teste não exercitaria a leitura.
+
 ## Onde ver o que deu errado
 
 Toda falha de leitura aparece em **dois** lugares, de propósito:

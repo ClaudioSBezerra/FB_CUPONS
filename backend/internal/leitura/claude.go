@@ -137,6 +137,10 @@ func (c *ClienteClaude) Ler(ctx context.Context, img imagem.Imagem, fonte string
 	b64 := base64.StdEncoding.EncodeToString(img.Dados)
 	inicio := time.Now()
 
+	// O modelo entra no resultado ANTES da chamada: numa falha, saber qual
+	// modelo foi tentado é metade do diagnóstico.
+	falha := Resultado{Modelo: c.modelo}
+
 	// O prompt de sistema (catálogo + clientes) é idêntico em todas as páginas
 	// do lote: marcá-lo para cache reduz o custo de um PDF de 20 páginas.
 	adaptativo := anthropic.ThinkingConfigAdaptiveParam{}
@@ -160,7 +164,8 @@ func (c *ClienteClaude) Ler(ctx context.Context, img imagem.Imagem, fonte string
 		},
 	})
 	if err != nil {
-		return Resultado{}, c.traduzErro(err)
+		falha.Duracao = time.Since(inicio)
+		return falha, c.traduzErro(err)
 	}
 
 	res := Resultado{

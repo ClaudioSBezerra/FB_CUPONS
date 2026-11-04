@@ -9,12 +9,109 @@ import { cnpj as fmtCNPJ, numeroDeTexto, reais } from "../formato";
  * Produtos com confirmado = false aparecem em destaque: são códigos que a
  * leitura encontrou mas cujo nome ainda precisa ser confirmado com o cliente.
  */
-export function Cadastros() {
+export function Cadastros({ papel }: { papel: "admin" | "operador" }) {
   return (
     <>
       <Produtos />
       <Clientes />
+      {papel === "admin" && <ZerarMovimento />}
     </>
+  );
+}
+
+/**
+ * ZerarMovimento apaga cupons, itens, fotos, importações e o log de leituras,
+ * para repetir a importação de um PDF durante os testes.
+ *
+ * Exige digitar APAGAR: a importação deduplica imagens por SHA-256, então sem
+ * limpar as fotos o mesmo arquivo seria recusado como "já importada" — o que
+ * torna esta ação frequente em teste e, por isso, fácil de clicar sem querer.
+ */
+function ZerarMovimento() {
+  const query = useQueryClient();
+  const [palavra, setPalavra] = useState("");
+  const [aberto, setAberto] = useState(false);
+
+  const zerar = useMutation({
+    mutationFn: api.zerarMovimento,
+    onSuccess: () => {
+      setPalavra("");
+      setAberto(false);
+      query.invalidateQueries();
+    },
+  });
+
+  return (
+    <div className="cartao" style={{ borderColor: "var(--erro)" }}>
+      <h2 style={{ color: "var(--erro)" }}>Zerar movimento</h2>
+
+      <p className="ajuda">
+        Apaga <strong>todos os cupons, itens, fotos, importações e o log de leituras</strong>.
+        Não tem volta. Clientes, catálogo de produtos e usuários são preservados.
+      </p>
+      <p className="ajuda">
+        Serve para repetir a importação de um PDF: como as imagens são deduplicadas
+        por conteúdo, sem limpar as fotos o mesmo arquivo é recusado como já
+        importado.
+      </p>
+
+      {!aberto ? (
+        <button className="secundaria perigo" onClick={() => setAberto(true)}>
+          Zerar movimento…
+        </button>
+      ) : (
+        <form
+          className="linha"
+          style={{ alignItems: "flex-end" }}
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (palavra === "APAGAR") zerar.mutate();
+          }}
+        >
+          <div>
+            <label htmlFor="z-conf">
+              Digite <strong>APAGAR</strong> para confirmar
+            </label>
+            <input
+              id="z-conf"
+              value={palavra}
+              onChange={(e) => setPalavra(e.target.value)}
+              autoComplete="off"
+            />
+          </div>
+          <div style={{ flex: "0 0 auto" }}>
+            <button
+              className="secundaria perigo"
+              type="submit"
+              disabled={palavra !== "APAGAR" || zerar.isPending}
+            >
+              {zerar.isPending ? "Apagando…" : "Apagar agora"}
+            </button>{" "}
+            <button
+              className="secundaria"
+              type="button"
+              onClick={() => {
+                setAberto(false);
+                setPalavra("");
+              }}
+            >
+              Cancelar
+            </button>
+          </div>
+        </form>
+      )}
+
+      {zerar.isError && <div className="erro">{(zerar.error as Error).message}</div>}
+
+      {zerar.data && (
+        <div className="sucesso">
+          Apagados: {zerar.data.apagado.cupons} cupom(ns), {zerar.data.apagado.itens} item(ns),{" "}
+          {zerar.data.apagado.fotos} foto(s), {zerar.data.apagado.importacoes} importação(ões),{" "}
+          {zerar.data.apagado.leituras} leitura(s). Preservados:{" "}
+          {zerar.data.preservado.join(", ")}.
+        </div>
+      )}
+    </div>
   );
 }
 

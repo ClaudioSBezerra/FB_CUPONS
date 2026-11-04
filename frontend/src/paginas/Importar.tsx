@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Importacao, type Sessao } from "../api";
 import { mesAtual, nomeMes, reais } from "../formato";
 
@@ -23,16 +23,37 @@ export function Importar({
   const entrada = useRef<HTMLInputElement>(null);
   const query = useQueryClient();
 
+  // O POST devolve 202 com o id do lote e a leitura segue no servidor. Esperar
+  // a resposta inteira não funciona: ler 18 páginas leva minutos e o proxy
+  // corta a requisição por volta de 100 segundos.
+  const [loteID, setLoteID] = useState<number | null>(null);
+
   const importar = useMutation<Importacao>({
     mutationFn: () => api.importar(arquivos, mes),
-    onSuccess: () => {
+    onSuccess: (lote) => {
+      setLoteID(lote.id);
       setArquivos([]);
       if (entrada.current) entrada.current.value = "";
-      // A lista de pendentes e o catálogo mudaram.
-      query.invalidateQueries({ queryKey: ["cupons"] });
-      query.invalidateQueries({ queryKey: ["produtos"] });
     },
   });
+
+  const lote = useQuery({
+    queryKey: ["importacao", loteID],
+    queryFn: () => api.importacao(loteID!),
+    enabled: loteID !== null,
+    // Enquanto processa, pergunta a cada 3 segundos. Quando termina, para.
+    refetchInterval: (consulta) =>
+      consulta.state.data?.status === "processando" ? 3000 : false,
+  });
+
+  const emAndamento = lote.data?.status === "processando";
+  const concluido = lote.data !== undefined && !emAndamento;
+
+  // Ao terminar, a lista de pendentes e o catálogo mudaram.
+  if (concluido && lote.data) {
+    query.invalidateQueries({ queryKey: ["cupons"] });
+    query.invalidateQueries({ queryKey: ["produtos"] });
+  }
 
   function acrescentar(novos: FileList | null) {
     if (!novos) return;
@@ -147,29 +168,95 @@ export function Importar({
               <div style={{ flex: "0 0 auto" }}>
                 <button
                   className="acao"
-                  disabled={importar.isPending || !sessao.leitura_habilitada}
+                  disabled={importar.isPending || emAndamento || !sessao.leitura_habilitada}
                   onClick={() => importar.mutate()}
                 >
-                  {importar.isPending ? "Lendo os cupons…" : "Importar e ler"}
+                  {importar.isPending ? "Enviando…" : "Importar e ler"}
                 </button>
               </div>
             </div>
-
-            {importar.isPending && (
-              <div className="aviso">
-                Lendo {arquivos.length} arquivo(s) com o modelo{" "}
-                <strong>{sessao.modelo}</strong>. Um PDF de 20 páginas leva alguns minutos —
-                não feche esta aba.
-              </div>
-            )}
           </>
         )}
 
         {importar.isError && <div className="erro">{(importar.error as Error).message}</div>}
+        {lote.isError && <div className="erro">{(lote.error as Error).message}</div>}
       </div>
 
-      {importar.data && <Resultado imp={importar.data} onRevisar={onRevisar} />}
+      {emAndamento && <Andamento imp={lote.data!} modelo={sessao.modelo} />}
+      {concluido && <Resultado imp={lote.data!} onRevisar={onRevisar} />}
     </>
+  );
+}
+
+/** Andamento mostra a barra de progresso enquanto o servidor lê as páginas. */
+function Andamento({ imp, modelo }: { imp: Importacao; modelo: string }) {
+  const prontas = imp.lidas + imp.duplicadas + imp.erros;
+  const total = imp.total_paginas;
+  const pct = total > 0 ? Math.round((prontas / total) * 100) : 0;
+
+  return (
+    <div className="cartao">
+      <h2>Lendo o lote #{imp.id}</h2>
+
+      {total === 0 ? (
+        <p className="ajuda">Separando as páginas dos arquivos…</p>
+      ) : (
+        <>
+          <div
+            style={{
+              height: "0.6rem",
+              background: "var(--borda)",
+              borderRadius: "999px",
+              overflow: "hidden",
+              margin: "0.75rem 0",
+            }}
+            role="progressbar"
+            aria-valuenow={pct}
+            aria-valuemin={0}
+            aria-valuemax={100}
+          >
+            <div
+              style={{
+                width: `${pct}%`,
+                height: "100%",
+                background: "var(--primaria)",
+                transition: "width 0.3s",
+              }}
+            />
+          </div>
+          <p>
+            <strong>
+              {prontas} de {total}
+            </strong>{" "}
+            página(s) · {imp.lidas} lida(s), {imp.duplicadas} já existente(s),{" "}
+            {imp.erros} com erro
+          </p>
+        </>
+      )}
+
+      <div className="aviso">
+        A leitura roda no servidor com o modelo <strong>{modelo}</strong>.
+        <strong> Você pode fechar esta aba</strong> — o lote continua, e o resultado
+        aparece na aba Revisão. Um PDF de 20 páginas leva alguns minutos.
+      </div>
+
+      {imp.detalhe.length > 0 && (
+        <details>
+          <summary className="ajuda">Ver páginas já processadas</summary>
+          <ul style={{ fontSize: "0.85rem" }}>
+            {imp.detalhe
+              .filter((d) => d.situacao)
+              .map((d, i) => (
+                <li key={i}>
+                  {d.arquivo} p.{d.pagina} — {d.situacao}
+                  {d.numero && ` (nº ${d.numero})`}
+                  {d.erro && `: ${d.erro}`}
+                </li>
+              ))}
+          </ul>
+        </details>
+      )}
+    </div>
   );
 }
 

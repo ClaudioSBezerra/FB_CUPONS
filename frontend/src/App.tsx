@@ -73,7 +73,7 @@ export function App() {
         )}
         {aba === "cupons" && <Cupons onAbrir={irParaRevisao} />}
         {aba === "cobranca" && <Cobranca />}
-        {aba === "cadastros" && <Cadastros />}
+        {aba === "cadastros" && <Cadastros papel={dados.usuario.papel} />}
       </main>
     </>
   );

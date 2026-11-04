@@ -72,19 +72,22 @@ func (s *Servidor) criarImportacao(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// A leitura roda DESTACADA da requisição e a resposta sai na hora.
+	//
+	// Ler 18 páginas pela API de visão leva minutos, e o proxy da Cloudflare
+	// corta a requisição por volta de 100 segundos. Quando cortava, o contexto
+	// era cancelado e todas as leituras morriam com "context canceled" — um
+	// lote inteiro perdido depois de já ter gasto as chamadas. A tela
+	// acompanha por GET /api/importacoes/{id}.
 	usuario, _ := UsuarioDoContexto(r.Context())
-	imp, err := s.importador.ImportarComMes(r.Context(), arquivos, &usuario.ID, mes)
+	imp, err := s.importador.EmSegundoPlano(r.Context(), arquivos, &usuario.ID, mes)
 	if err != nil {
-		s.log.Error("falha na importação", "erro", err, "arquivos", len(arquivos))
+		s.log.Error("falha ao abrir a importação", "erro", err, "arquivos", len(arquivos))
 		erroJSON(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	status := http.StatusCreated
-	if imp.Status == "falhou" {
-		status = http.StatusUnprocessableEntity
-	}
-	escreverJSON(w, status, imp)
+	escreverJSON(w, http.StatusAccepted, imp)
 }
 
 func (s *Servidor) obterImportacao(w http.ResponseWriter, r *http.Request) {

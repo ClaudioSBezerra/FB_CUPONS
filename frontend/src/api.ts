@@ -247,6 +247,13 @@ export const api = {
   salvarProduto: (p: Produto) =>
     pedir<Produto>(`/produtos/${p.id}`, { method: "PUT", body: JSON.stringify(p) }),
 
+  // --- manutenção (admin) ---
+  zerarMovimento: () =>
+    pedir<{ apagado: Record<string, number>; preservado: string[] }>(
+      "/admin/zerar-movimento",
+      { method: "POST", body: JSON.stringify({ confirmacao: "APAGAR" }) },
+    ),
+
   // --- cobrança ---
   cobranca: (mes: string, clienteID = 0) => {
     const q = new URLSearchParams({ mes });

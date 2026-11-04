@@ -63,6 +63,23 @@ func (s *Store) FinalizarImportacao(ctx context.Context, imp Importacao) error {
 	return err
 }
 
+// AtualizarProgressoImportacao grava o andamento parcial, para a tela
+// acompanhar um lote que ainda está rodando.
+func (s *Store) AtualizarProgressoImportacao(ctx context.Context, imp Importacao) error {
+	detalhe, err := json.Marshal(imp.Detalhe)
+	if err != nil {
+		return err
+	}
+	_, err = s.pool.Exec(ctx,
+		`UPDATE importacoes
+		    SET total_paginas = $2, lidas = $3, com_pendencia = $4, duplicadas = $5,
+		        erros = $6, detalhe = $7
+		  WHERE id = $1`,
+		imp.ID, imp.TotalPaginas, imp.Lidas, imp.ComPendencia, imp.Duplicadas,
+		imp.Erros, detalhe)
+	return err
+}
+
 // ImportacaoPorID devolve o lote, para a tela acompanhar o andamento.
 func (s *Store) ImportacaoPorID(ctx context.Context, id int64) (Importacao, error) {
 	var imp Importacao

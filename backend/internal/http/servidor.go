@@ -101,6 +101,8 @@ func (s *Servidor) Rotas() http.Handler {
 			priv.With(s.exigirAdmin).Get("/admin/usuarios", s.listarUsuarios)
 			priv.With(s.exigirAdmin).Post("/admin/usuarios", s.criarUsuario)
 			priv.With(s.exigirAdmin).Get("/admin/uso", s.uso)
+			// Destrutivo: só admin, e exige confirmação digitada no corpo.
+			priv.With(s.exigirAdmin).Post("/admin/zerar-movimento", s.zerarMovimento)
 		})
 	})
 
