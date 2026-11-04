@@ -73,6 +73,27 @@ ANTHROPIC_API_KEY=
 # Anthropic.
 ANTHROPIC_BASE_URL=
 
+# Recursos exclusivos da API da Anthropic: cache do prompt, raciocínio
+# adaptativo e saída estruturada por schema. Backend apenas COMPATÍVEL
+# costuma recusá-los.
+#
+# Vazio decide sozinho pelo endereço: ligado em api.anthropic.com, desligado
+# quando ANTHROPIC_BASE_URL aponta para outro lugar. Só preencha para forçar.
+LEITURA_RECURSOS_ANTHROPIC=
+
+# --- Exemplo: DeepSeek ------------------------------------------------
+# O endpoint compatível com Anthropic do DeepSeek aceita imagem no modelo
+# deepseek-flash (o deepseek-v4-pro NÃO processa imagem — substitui por
+# "[Unsupported Image]", o que arruinaria a leitura em silêncio).
+#
+#   ANTHROPIC_API_KEY=<chave do DeepSeek>
+#   ANTHROPIC_BASE_URL=https://api.deepseek.com/anthropic
+#   CLAUDE_MODEL=deepseek-flash
+#   CLAUDE_MODEL_FORTE=deepseek-flash
+#
+# CLAUDE_MODEL_FORTE também precisa ser um modelo com visão: ele é usado pelo
+# botão "reler com modelo mais forte".
+
 # Modelo da leitura normal e do botão "reler com modelo mais forte".
 CLAUDE_MODEL=claude-opus-5
 CLAUDE_MODEL_FORTE=claude-fable-5

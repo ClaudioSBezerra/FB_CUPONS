@@ -119,19 +119,27 @@ func executar(log *slog.Logger) error {
 	var leitor leitura.Leitor
 	if cfg.LeituraHabilitada() {
 		cliente := leitura.NovoClienteClaude(leitura.Opcoes{
-			APIKey:  cfg.AnthropicAPIKey,
-			BaseURL: cfg.AnthropicBaseURL,
-			Modelo:  cfg.ClaudeModelo,
-			Esforco: cfg.ClaudeEsforco,
-			Timeout: cfg.ClaudeTimeout,
+			APIKey:            cfg.AnthropicAPIKey,
+			BaseURL:           cfg.AnthropicBaseURL,
+			Modelo:            cfg.ClaudeModelo,
+			Esforco:           cfg.ClaudeEsforco,
+			Timeout:           cfg.ClaudeTimeout,
+			RecursosAnthropic: cfg.RecursosAnthropic,
 		})
 		leitor = cliente
 		// O endereço entra no log de propósito: foi a informação que faltou
 		// quando uma chave de gateway foi usada contra api.anthropic.com.
-		log.Info("leitura via Claude habilitada",
+		log.Info("leitura por visão habilitada",
 			"endereco", cliente.BaseURL(),
 			"modelo", cfg.ClaudeModelo, "modelo_forte", cfg.ClaudeModeloForte,
+			"recursos_anthropic", cliente.RecursosAnthropic(),
 			"esforco", cfg.ClaudeEsforco, "concorrencia", cfg.Concorrencia)
+		if !cliente.RecursosAnthropic() {
+			log.Warn("recursos exclusivos da Anthropic desligados: sem cache de prompt, " +
+				"sem raciocínio adaptativo e sem saída estruturada por schema. " +
+				"O JSON passa a depender da instrução do prompt. " +
+				"Ligue com LEITURA_RECURSOS_ANTHROPIC=1 se o backend os suportar")
+		}
 	} else {
 		leitor = leitura.NovoLeitorGravado()
 		log.Warn("ANTHROPIC_API_KEY não definida: a importação por PDF está indisponível")

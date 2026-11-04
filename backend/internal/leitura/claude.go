@@ -39,6 +39,7 @@ type ClienteClaude struct {
 	api       anthropic.Client
 	modelo    string
 	baseURL   string
+	recursos  bool
 	maxTokens int64
 	esforco   anthropic.OutputConfigEffort
 }
@@ -56,6 +57,9 @@ type Opcoes struct {
 	// Esforco controla profundidade de raciocínio e custo: low, medium, high,
 	// xhigh, max. Vazio usa "high".
 	Esforco string
+	// RecursosAnthropic liga raciocínio adaptativo, saída estruturada por
+	// schema e cache de prompt. Backend apenas compatível costuma recusar.
+	RecursosAnthropic bool
 	// MaxTokens da resposta. 0 usa 16000, que acomoda um cupom de 30 itens.
 	MaxTokens int64
 	// Timeout de cada chamada. 0 usa 3 minutos.
@@ -107,6 +111,7 @@ func NovoClienteClaude(opc Opcoes) *ClienteClaude {
 		api:       anthropic.NewClient(opts...),
 		modelo:    modelo,
 		baseURL:   base,
+		recursos:  opc.RecursosAnthropic,
 		maxTokens: maxTokens,
 		esforco:   esforco,
 	}
@@ -128,6 +133,10 @@ func (c *ClienteClaude) Modelo() string { return c.modelo }
 // BaseURL informa para onde as requisições vão, para aparecer no log.
 func (c *ClienteClaude) BaseURL() string { return c.baseURL }
 
+// RecursosAnthropic informa se os recursos exclusivos da Anthropic estão
+// ligados nesta leitura.
+func (c *ClienteClaude) RecursosAnthropic() bool { return c.recursos }
+
 // Ler envia a imagem ao Claude e devolve o cupom lido.
 func (c *ClienteClaude) Ler(ctx context.Context, img imagem.Imagem, fonte string, ref Referencias) (Resultado, error) {
 	if len(img.Dados) == 0 {
@@ -141,28 +150,39 @@ func (c *ClienteClaude) Ler(ctx context.Context, img imagem.Imagem, fonte string
 	// modelo foi tentado é metade do diagnóstico.
 	falha := Resultado{Modelo: c.modelo}
 
-	// O prompt de sistema (catálogo + clientes) é idêntico em todas as páginas
-	// do lote: marcá-lo para cache reduz o custo de um PDF de 20 páginas.
-	adaptativo := anthropic.ThinkingConfigAdaptiveParam{}
-	resp, err := c.api.Messages.New(ctx, anthropic.MessageNewParams{
+	params := anthropic.MessageNewParams{
 		Model:     anthropic.Model(c.modelo),
 		MaxTokens: c.maxTokens,
-		System: []anthropic.TextBlockParam{{
-			Text:         MontarSistema(ref),
-			CacheControl: anthropic.NewCacheControlEphemeralParam(),
-		}},
-		Thinking: anthropic.ThinkingConfigParamUnion{OfAdaptive: &adaptativo},
-		OutputConfig: anthropic.OutputConfigParam{
-			Effort: c.esforco,
-			Format: anthropic.JSONOutputFormatParam{Schema: SchemaJSON()},
-		},
+		System:    []anthropic.TextBlockParam{{Text: MontarSistema(ref)}},
 		Messages: []anthropic.MessageParam{
 			anthropic.NewUserMessage(
 				anthropic.NewImageBlockBase64(img.Mime, b64),
 				anthropic.NewTextBlock(instrucaoPagina(fonte)),
 			),
 		},
-	})
+	}
+
+	if c.recursos {
+		// Recursos exclusivos da API da Anthropic. Um backend apenas
+		// compatível (DeepSeek, gateways) costuma recusar ou ignorar, então
+		// só vão quando o destino é a API de verdade.
+		//
+		//  * cache do prompt de sistema: o catálogo e os clientes são
+		//    idênticos em todas as páginas do lote, o que derruba o custo de
+		//    um PDF de 20 páginas;
+		//  * raciocínio adaptativo: ajuda em cupom apagado;
+		//  * saída estruturada por schema: garante JSON válido em vez de
+		//    depender da instrução do prompt.
+		params.System[0].CacheControl = anthropic.NewCacheControlEphemeralParam()
+		adaptativo := anthropic.ThinkingConfigAdaptiveParam{}
+		params.Thinking = anthropic.ThinkingConfigParamUnion{OfAdaptive: &adaptativo}
+		params.OutputConfig = anthropic.OutputConfigParam{
+			Effort: c.esforco,
+			Format: anthropic.JSONOutputFormatParam{Schema: SchemaJSON()},
+		}
+	}
+
+	resp, err := c.api.Messages.New(ctx, params)
 	if err != nil {
 		falha.Duracao = time.Since(inicio)
 		return falha, c.traduzErro(err)

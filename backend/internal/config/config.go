@@ -38,7 +38,13 @@ type Config struct {
 	// AnthropicBaseURL permite apontar para um gateway compatível com a API
 	// Messages (OmniRoute, OpenRouter em modo Anthropic, proxy corporativo).
 	// Vazio usa api.anthropic.com.
-	AnthropicBaseURL  string
+	AnthropicBaseURL string
+	// RecursosAnthropic liga os recursos exclusivos da API da Anthropic:
+	// raciocínio adaptativo, saída estruturada por schema e cache de prompt.
+	// Um backend apenas COMPATÍVEL costuma recusá-los. Por isso o padrão
+	// acompanha o endereço: ligado em api.anthropic.com, desligado quando
+	// ANTHROPIC_BASE_URL aponta para outro lugar.
+	RecursosAnthropic bool
 	ClaudeModelo      string
 	ClaudeModeloForte string
 	ClaudeEsforco     string
@@ -89,6 +95,8 @@ func Carregar() (Config, error) {
 			texto("DB_SSLMODE", "disable"),
 		)
 	}
+
+	c.RecursosAnthropic = booleano("LEITURA_RECURSOS_ANTHROPIC", c.AnthropicBaseURL == "")
 
 	origens := texto("CORS_ORIGENS", "")
 	for _, o := range strings.Split(origens, ",") {
@@ -233,6 +241,19 @@ func texto(chave, padrao string) string {
 		return v
 	}
 	return padrao
+}
+
+// booleano lê uma variável de ambiente como sim/não, aceitando as grafias
+// usuais. Vazia devolve o padrão.
+func booleano(chave string, padrao bool) bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(chave))) {
+	case "":
+		return padrao
+	case "1", "true", "sim", "t", "yes", "on":
+		return true
+	default:
+		return false
+	}
 }
 
 func numero(chave string, padrao int) int {

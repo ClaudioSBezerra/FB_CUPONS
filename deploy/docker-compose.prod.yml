@@ -72,6 +72,10 @@ services:
       # Endereço da API. Vazio = api.anthropic.com. Preencha se a chave for
       # de um gateway compatível com a API Messages (OmniRoute, proxy).
       ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL-}
+      # Recursos exclusivos da Anthropic (cache de prompt, raciocínio
+      # adaptativo, saída estruturada por schema). Vazio decide pelo
+      # endereço: ligado em api.anthropic.com, desligado fora dela.
+      LEITURA_RECURSOS_ANTHROPIC: ${LEITURA_RECURSOS_ANTHROPIC-}
       CLAUDE_MODEL: ${CLAUDE_MODEL:-claude-opus-5}
       CLAUDE_MODEL_FORTE: ${CLAUDE_MODEL_FORTE:-claude-fable-5}
       CLAUDE_ESFORCO: ${CLAUDE_ESFORCO:-high}

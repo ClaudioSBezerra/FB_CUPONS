@@ -261,7 +261,8 @@ Todas em [`.env.example`](.env.example), com explicação. As que mais importam:
 | Variável | Para que serve |
 |---|---|
 | `ANTHROPIC_API_KEY` | credencial da leitura. **Só no servidor** — nunca vai ao frontend nem ao log |
-| `ANTHROPIC_BASE_URL` | vazio = `api.anthropic.com`. Preencha se a chave for de um gateway compatível com a API Messages (OmniRoute, proxy). Chave de gateway contra `api.anthropic.com` volta `401 invalid x-api-key` |
+| `ANTHROPIC_BASE_URL` | vazio = `api.anthropic.com`. Preencha para um backend compatível com a API Messages. Chave de gateway contra `api.anthropic.com` volta `401 invalid x-api-key` |
+| `LEITURA_RECURSOS_ANTHROPIC` | cache de prompt, raciocínio adaptativo e saída estruturada por schema. Vazio decide pelo endereço: ligado em `api.anthropic.com`, desligado fora dela |
 | `CLAUDE_MODEL` | modelo da leitura normal (padrão `claude-opus-5`) |
 | `CLAUDE_MODEL_FORTE` | modelo do botão "reler com modelo mais forte" (padrão `claude-fable-5`) |
 | `CLAUDE_ESFORCO` | `low`…`max`. Cupom apagado melhora com esforço maior, e custa mais |
@@ -293,6 +294,28 @@ curl -b cookies.txt -F arquivos=@legado/cupons-outubro-2026-itens.json \
 
 A agregação da aba *Cobrança* do xlsx de referência foi reproduzida a partir dos dois JSONs:
 31 chaves (cliente + produto + unidade), idênticas em quantidade, nº de cupons e valor.
+
+## Trocar o provedor da leitura
+
+A leitura fala a API Messages, então qualquer backend compatível serve — mas
+**o modelo precisa enxergar imagem**. Um modelo só de texto não falha de forma
+óbvia: ele responde como se não houvesse foto, e a cobrança sai errada.
+
+| Provedor | Configuração | Visão |
+|---|---|---|
+| Anthropic | `ANTHROPIC_BASE_URL` vazio, `CLAUDE_MODEL=claude-opus-5` | sim |
+| DeepSeek | `ANTHROPIC_BASE_URL=https://api.deepseek.com/anthropic`, `CLAUDE_MODEL=deepseek-flash` | sim, em `deepseek-flash`; `deepseek-v4-pro` **não** |
+| OmniRoute (`combo_omniroute`) | — | **não** — responde `no vision-capable provider connected` |
+
+Fora de `api.anthropic.com`, os recursos exclusivos (cache de prompt,
+raciocínio adaptativo, saída estruturada por schema) são **desligados
+automaticamente**, porque um backend compatível costuma recusá-los. Sem a saída
+estruturada o JSON passa a depender da instrução do prompt — o parser tolera
+cerca de markdown e texto em volta, mas a garantia de schema se perde. Para
+forçar, `LEITURA_RECURSOS_ANTHROPIC=1`.
+
+`CLAUDE_MODEL_FORTE` também precisa ter visão: é o modelo do botão "reler com
+modelo mais forte" na Revisão.
 
 ## A importação é assíncrona
 
