@@ -2,7 +2,12 @@
 # FB_CUPONS — Variáveis de Ambiente para Coolify (Produção)
 # Domínio: cupom.fbtax.cloud
 # Docker Compose Location: /docker-compose.coolify.yml
-# Domains: cupom.fbtax.cloud -> serviço "frontend", porta 80
+# Domains: no serviço "frontend", informe COM o esquema:
+#              https://cupom.fbtax.cloud
+#          O serviço "api" NÃO recebe domínio — o nginx do frontend repassa
+#          /api pela rede interna.
+#          Sem o "https://" o Coolify trata o valor como caminho e gera
+#          rule: Host(``) && PathPrefix(`cupom.fbtax.cloud`), que dá 404.
 # ============================================================
 #
 # Cole este bloco em Environment Variables e substitua o que está em

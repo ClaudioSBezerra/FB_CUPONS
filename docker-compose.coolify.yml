@@ -26,7 +26,9 @@
 #      (o padrão é /docker-compose.yml, que é o de DESENVOLVIMENTO e publica
 #      porta no host — foi o que causou "port is already allocated")
 #   3. Em Environment Variables, defina os segredos (lista abaixo)
-#   4. Em Domains, atribua cupom.fbtax.cloud ao serviço "frontend", porta 80
+#   4. Em Domains, no serviço "frontend", informe COM esquema:
+#      https://cupom.fbtax.cloud
+#      (a porta 80 é o padrão; o serviço "api" NÃO recebe domínio)
 #   5. Deploy
 #
 # Variáveis do painel: copie o bloco de coolify-env-template.txt.
@@ -116,10 +118,20 @@ services:
     restart: unless-stopped
     depends_on:
       - api
-    environment:
-      # Variável mágica do Coolify: gera e associa o domínio a este serviço,
-      # na porta 80. Também é possível fazer isso pela aba Domains do painel.
-      SERVICE_FQDN_FRONTEND_80: ${DOMINIO_PATH:-/}
+    # O domínio é atribuído SOMENTE pela aba Domains do painel, apontando
+    # para este serviço. Não use a variável mágica SERVICE_FQDN_*: ela mexe no
+    # mesmo roteador do Traefik e os dois mecanismos juntos produzem regra
+    # inválida.
+    #
+    # No campo Domains, informe a URL COM o esquema:
+    #
+    #     https://cupom.fbtax.cloud
+    #
+    # Sem o "https://", o Coolify trata o valor como CAMINHO e gera
+    #   rule: Host(``) && PathPrefix(`cupom.fbtax.cloud`)
+    # que não casa com nenhuma requisição — o sintoma é 404 do Traefik mesmo
+    # com o Host certo. Sem o esquema também não nasce roteador https, e por
+    # consequência nenhum certificado.
 
 volumes:
   postgres-dados:

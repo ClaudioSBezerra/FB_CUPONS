@@ -108,8 +108,27 @@ Não use o `docker-compose.prod.yml` aqui: o Caddy dele disputaria as portas
 3. Em **Environment Variables**, cole o bloco de
    [`coolify-env-template.txt`](coolify-env-template.txt) e substitua o que está
    em MAIÚSCULAS.
-4. Em **Domains**, atribua `cupom.fbtax.cloud` ao serviço **frontend**, porta **80**.
+4. Em **Domains**, no serviço **frontend**, informe a URL **com o esquema**:
+
+   ```
+   https://cupom.fbtax.cloud
+   ```
+
+   O serviço **api** não recebe domínio — o nginx do frontend repassa `/api`
+   pela rede interna.
 5. Deploy.
+
+> **O `https://` não é opcional.** Sem o esquema, o Coolify trata o valor como
+> *caminho* e gera a regra
+> ``Host(``) && PathPrefix(`cupom.fbtax.cloud`)`` — host vazio, que não casa com
+> requisição nenhuma. O sintoma é 404 do Traefik mesmo batendo direto no IP com
+> o cabeçalho `Host` correto, e nenhum roteador `https`, logo nenhum
+> certificado. Diagnóstico no servidor:
+>
+> ```bash
+> docker inspect $(docker ps -qf name=frontend-<uuid>) \
+>   --format '{{json .Config.Labels}}' | tr ',' '\n' | grep -i traefik
+> ```
 
 #### O que impede a API de subir, e o que só avisa
 
