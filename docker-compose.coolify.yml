@@ -100,6 +100,9 @@ services:
       # Excel seguem valendo, e a aba Importar aparece desativada com o motivo.
       # Preencher depois no painel e redeployar habilita a leitura.
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY-}
+      # Endereço da API. Vazio = api.anthropic.com. Preencha se a chave for
+      # de um gateway compatível com a API Messages (OmniRoute, proxy).
+      ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL-}
       CLAUDE_MODEL: ${CLAUDE_MODEL:-claude-opus-5}
       CLAUDE_MODEL_FORTE: ${CLAUDE_MODEL_FORTE:-claude-fable-5}
       CLAUDE_ESFORCO: ${CLAUDE_ESFORCO:-high}

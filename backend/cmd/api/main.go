@@ -118,13 +118,18 @@ func executar(log *slog.Logger) error {
 	//    automática — revisão manual, cobrança e Excel continuam valendo.
 	var leitor leitura.Leitor
 	if cfg.LeituraHabilitada() {
-		leitor = leitura.NovoClienteClaude(leitura.Opcoes{
+		cliente := leitura.NovoClienteClaude(leitura.Opcoes{
 			APIKey:  cfg.AnthropicAPIKey,
+			BaseURL: cfg.AnthropicBaseURL,
 			Modelo:  cfg.ClaudeModelo,
 			Esforco: cfg.ClaudeEsforco,
 			Timeout: cfg.ClaudeTimeout,
 		})
+		leitor = cliente
+		// O endereço entra no log de propósito: foi a informação que faltou
+		// quando uma chave de gateway foi usada contra api.anthropic.com.
 		log.Info("leitura via Claude habilitada",
+			"endereco", cliente.BaseURL(),
 			"modelo", cfg.ClaudeModelo, "modelo_forte", cfg.ClaudeModeloForte,
 			"esforco", cfg.ClaudeEsforco, "concorrencia", cfg.Concorrencia)
 	} else {

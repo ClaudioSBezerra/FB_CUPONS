@@ -34,7 +34,11 @@ type Config struct {
 	AdminSenha    string
 
 	// Leitura via Claude
-	AnthropicAPIKey   string
+	AnthropicAPIKey string
+	// AnthropicBaseURL permite apontar para um gateway compatível com a API
+	// Messages (OmniRoute, OpenRouter em modo Anthropic, proxy corporativo).
+	// Vazio usa api.anthropic.com.
+	AnthropicBaseURL  string
 	ClaudeModelo      string
 	ClaudeModeloForte string
 	ClaudeEsforco     string
@@ -60,6 +64,7 @@ func Carregar() (Config, error) {
 		AdminEmail:        texto("ADMIN_EMAIL", ""),
 		AdminSenha:        os.Getenv("ADMIN_SENHA"),
 		AnthropicAPIKey:   os.Getenv("ANTHROPIC_API_KEY"),
+		AnthropicBaseURL:  texto("ANTHROPIC_BASE_URL", ""),
 		ClaudeModelo:      texto("CLAUDE_MODEL", "claude-opus-5"),
 		ClaudeModeloForte: texto("CLAUDE_MODEL_FORTE", "claude-fable-5"),
 		ClaudeEsforco:     texto("CLAUDE_ESFORCO", "high"),

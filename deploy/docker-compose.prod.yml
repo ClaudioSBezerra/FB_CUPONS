@@ -69,6 +69,9 @@ services:
       UPLOAD_MAX_MB: ${UPLOAD_MAX_MB:-50}
 
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:?defina ANTHROPIC_API_KEY no .env}
+      # Endereço da API. Vazio = api.anthropic.com. Preencha se a chave for
+      # de um gateway compatível com a API Messages (OmniRoute, proxy).
+      ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL-}
       CLAUDE_MODEL: ${CLAUDE_MODEL:-claude-opus-5}
       CLAUDE_MODEL_FORTE: ${CLAUDE_MODEL_FORTE:-claude-fable-5}
       CLAUDE_ESFORCO: ${CLAUDE_ESFORCO:-high}

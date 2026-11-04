@@ -60,6 +60,19 @@ ADMIN_SENHA=SUBSTITUIR_minimo_8_caracteres
 # A chave fica só no servidor — nunca vai ao frontend nem ao log.
 ANTHROPIC_API_KEY=
 
+# Endereço da API. Vazio = api.anthropic.com.
+#
+# Preencha SÓ se a chave for de um gateway compatível com a API Messages da
+# Anthropic (OmniRoute, proxy corporativo). Uma chave de gateway enviada para
+# api.anthropic.com é recusada com 401 "invalid x-api-key" — o endereço tem de
+# acompanhar a chave. O log de subida mostra para onde as requisições vão, no
+# campo "endereco" da linha "leitura via Claude habilitada".
+#
+# Atenção: o gateway precisa expor /v1/messages no formato da Anthropic. Se
+# ele só fala o formato da OpenAI, não serve — o SDK usado aqui é o da
+# Anthropic.
+ANTHROPIC_BASE_URL=
+
 # Modelo da leitura normal e do botão "reler com modelo mais forte".
 CLAUDE_MODEL=claude-opus-5
 CLAUDE_MODEL_FORTE=claude-fable-5

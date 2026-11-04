@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"image"
 	"image/color"
 	"image/jpeg"
@@ -13,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/ClaudioSBezerra/FB_CUPONS/backend/internal/dominio"
+	"github.com/ClaudioSBezerra/FB_CUPONS/backend/internal/imagem"
 	"github.com/ClaudioSBezerra/FB_CUPONS/backend/internal/leitura"
 	"github.com/ClaudioSBezerra/FB_CUPONS/backend/internal/store"
 )
@@ -411,5 +413,105 @@ func TestImportarSemArquivos(t *testing.T) {
 	svc := NovoServico(novoStoreFake(), leitura.NovoLeitorGravado(), logSilencioso())
 	if _, err := svc.Importar(context.Background(), nil, nil); err == nil {
 		t.Error("deveria recusar um lote vazio")
+	}
+}
+
+// logCapturado coleta as linhas de log para os testes conferirem o que foi
+// registrado.
+type logCapturado struct{ linhas []string }
+
+func (l *logCapturado) Write(p []byte) (int, error) {
+	l.linhas = append(l.linhas, string(p))
+	return len(p), nil
+}
+
+func (l *logCapturado) contem(sub string) bool {
+	for _, x := range l.linhas {
+		if strings.Contains(x, sub) {
+			return true
+		}
+	}
+	return false
+}
+
+// leitorQueFalha devolve sempre erro, como aconteceu com a chave de gateway
+// apontando para api.anthropic.com.
+type leitorQueFalha struct{ msg string }
+
+func (l leitorQueFalha) Ler(context.Context, imagem.Imagem, string, leitura.Referencias) (leitura.Resultado, error) {
+	return leitura.Resultado{Modelo: "claude-opus-5"}, errors.New(l.msg)
+}
+
+func TestFalhaDeLeituraVaiParaOLog(t *testing.T) {
+	// A falha era gravada só em leituras_log, no banco. Quem olhava o log do
+	// contêiner não via nada, e a importação parecia não ter acontecido.
+	cap := &logCapturado{}
+	log := slog.New(slog.NewJSONHandler(cap, nil))
+
+	st := novoStoreFake()
+	svc := NovoServico(st, leitorQueFalha{msg: "a credencial foi recusada por https://api.anthropic.com"}, log)
+
+	imp, err := svc.Importar(context.Background(),
+		[]Arquivo{{Nome: "cupom.jpg", Dados: jpegCupom(t, 80)}}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if imp.Erros != 1 {
+		t.Fatalf("erros = %d, quer 1", imp.Erros)
+	}
+
+	for _, esperado := range []string{
+		"falha ao ler cupom",
+		"cupom.jpg",
+		"credencial foi recusada",
+		"importação concluída",
+	} {
+		if !cap.contem(esperado) {
+			t.Errorf("o log não registrou %q.\nlog: %v", esperado, cap.linhas)
+		}
+	}
+
+	// E continua gravando no banco, para a auditoria de custo.
+	if len(st.leituras) != 1 || st.leituras[0].Erro == "" {
+		t.Errorf("a falha deveria continuar em leituras_log: %+v", st.leituras)
+	}
+}
+
+func TestResumoDoLoteVaiParaOLog(t *testing.T) {
+	cap := &logCapturado{}
+	log := slog.New(slog.NewJSONHandler(cap, nil))
+
+	st := novoStoreFake()
+	leitor := leitura.NovoLeitorGravado(
+		respostaCupom("1340923", "37678845000736", "MATERNIDADE CÉLIA CÂMARA", 120.00, itemPaoFrances))
+	svc := NovoServico(st, leitor, log)
+
+	if _, err := svc.Importar(context.Background(),
+		[]Arquivo{{Nome: "ok.jpg", Dados: jpegCupom(t, 70)}}, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, esperado := range []string{"importação iniciada", "importação concluída", "lidas"} {
+		if !cap.contem(esperado) {
+			t.Errorf("o log não registrou %q.\nlog: %v", esperado, cap.linhas)
+		}
+	}
+}
+
+func TestLimiteDiarioVaiParaOLog(t *testing.T) {
+	cap := &logCapturado{}
+	log := slog.New(slog.NewJSONHandler(cap, nil))
+
+	st := novoStoreFake()
+	st.leiturasHoje = 5
+	svc := NovoServico(st, leitura.NovoLeitorGravado(), log)
+	svc.LimiteDiario = 5
+
+	if _, err := svc.Importar(context.Background(),
+		[]Arquivo{{Nome: "a.jpg", Dados: jpegCupom(t, 60)}}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if !cap.contem("limite diário") {
+		t.Errorf("o log não explicou o bloqueio.\nlog: %v", cap.linhas)
 	}
 }

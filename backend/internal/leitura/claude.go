@@ -38,6 +38,7 @@ type Resultado struct {
 type ClienteClaude struct {
 	api       anthropic.Client
 	modelo    string
+	baseURL   string
 	maxTokens int64
 	esforco   anthropic.OutputConfigEffort
 }
@@ -47,6 +48,9 @@ type Opcoes struct {
 	// APIKey vazia deixa o SDK resolver a credencial (ANTHROPIC_API_KEY ou
 	// perfil OAuth em ~/.config/anthropic).
 	APIKey string
+	// BaseURL aponta para um gateway compatível com a API Messages. Vazio
+	// usa api.anthropic.com.
+	BaseURL string
 	// Modelo padrão das leituras. Vazio usa ModeloPadrao.
 	Modelo string
 	// Esforco controla profundidade de raciocínio e custo: low, medium, high,
@@ -72,6 +76,9 @@ func NovoClienteClaude(opc Opcoes) *ClienteClaude {
 	if opc.APIKey != "" {
 		opts = append(opts, option.WithAPIKey(opc.APIKey))
 	}
+	if opc.BaseURL != "" {
+		opts = append(opts, option.WithBaseURL(opc.BaseURL))
+	}
 	timeout := opc.Timeout
 	if timeout <= 0 {
 		timeout = 3 * time.Minute
@@ -91,9 +98,15 @@ func NovoClienteClaude(opc Opcoes) *ClienteClaude {
 		esforco = anthropic.OutputConfigEffortHigh
 	}
 
+	base := opc.BaseURL
+	if base == "" {
+		base = "https://api.anthropic.com"
+	}
+
 	return &ClienteClaude{
 		api:       anthropic.NewClient(opts...),
 		modelo:    modelo,
+		baseURL:   base,
 		maxTokens: maxTokens,
 		esforco:   esforco,
 	}
@@ -111,6 +124,9 @@ func (c *ClienteClaude) ComModelo(modelo string) *ClienteClaude {
 
 // Modelo informa qual modelo este leitor usa.
 func (c *ClienteClaude) Modelo() string { return c.modelo }
+
+// BaseURL informa para onde as requisições vão, para aparecer no log.
+func (c *ClienteClaude) BaseURL() string { return c.baseURL }
 
 // Ler envia a imagem ao Claude e devolve o cupom lido.
 func (c *ClienteClaude) Ler(ctx context.Context, img imagem.Imagem, fonte string, ref Referencias) (Resultado, error) {
@@ -144,7 +160,7 @@ func (c *ClienteClaude) Ler(ctx context.Context, img imagem.Imagem, fonte string
 		},
 	})
 	if err != nil {
-		return Resultado{}, traduzErro(err)
+		return Resultado{}, c.traduzErro(err)
 	}
 
 	res := Resultado{
@@ -186,14 +202,16 @@ func (c *ClienteClaude) Ler(ctx context.Context, img imagem.Imagem, fonte string
 
 // traduzErro transforma o erro da API em mensagem útil ao operador, mantendo
 // o original encadeado para os logs.
-func traduzErro(err error) error {
+func (c *ClienteClaude) traduzErro(err error) error {
 	var apierr *anthropic.Error
 	if !errors.As(err, &apierr) {
 		return fmt.Errorf("falha ao falar com a API do Claude: %w", err)
 	}
 	switch apierr.StatusCode {
 	case 401, 403:
-		return fmt.Errorf("a API do Claude recusou a credencial — confira ANTHROPIC_API_KEY: %w", err)
+		return fmt.Errorf("a credencial foi recusada por %s — confira ANTHROPIC_API_KEY. "+
+			"Se a chave é de um gateway (OmniRoute, OpenRouter, proxy), defina também "+
+			"ANTHROPIC_BASE_URL com o endereço dele: %w", c.baseURL, err)
 	case 404:
 		return fmt.Errorf("modelo de leitura não encontrado — confira CLAUDE_MODEL: %w", err)
 	case 413:

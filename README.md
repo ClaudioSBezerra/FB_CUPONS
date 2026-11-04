@@ -261,6 +261,7 @@ Todas em [`.env.example`](.env.example), com explicação. As que mais importam:
 | Variável | Para que serve |
 |---|---|
 | `ANTHROPIC_API_KEY` | credencial da leitura. **Só no servidor** — nunca vai ao frontend nem ao log |
+| `ANTHROPIC_BASE_URL` | vazio = `api.anthropic.com`. Preencha se a chave for de um gateway compatível com a API Messages (OmniRoute, proxy). Chave de gateway contra `api.anthropic.com` volta `401 invalid x-api-key` |
 | `CLAUDE_MODEL` | modelo da leitura normal (padrão `claude-opus-5`) |
 | `CLAUDE_MODEL_FORTE` | modelo do botão "reler com modelo mais forte" (padrão `claude-fable-5`) |
 | `CLAUDE_ESFORCO` | `low`…`max`. Cupom apagado melhora com esforço maior, e custa mais |
@@ -292,6 +293,27 @@ curl -b cookies.txt -F arquivos=@legado/cupons-outubro-2026-itens.json \
 
 A agregação da aba *Cobrança* do xlsx de referência foi reproduzida a partir dos dois JSONs:
 31 chaves (cliente + produto + unidade), idênticas em quantidade, nº de cupons e valor.
+
+## Onde ver o que deu errado
+
+Toda falha de leitura aparece em **dois** lugares, de propósito:
+
+| Lugar | Para quê |
+|---|---|
+| log da aplicação (`stdout`) | diagnóstico imediato: `falha ao ler cupom` com arquivo, página, modelo e o erro; `importação iniciada` e `importação concluída` com o resumo |
+| tabela `leituras_log` | auditoria e custo: uma linha por chamada ao Claude, com tokens, duração e a resposta bruta |
+
+A linha de subida `leitura via Claude habilitada` traz o campo `endereco`, que
+diz para onde as requisições vão — é a informação que faltava quando uma chave
+de gateway foi usada contra `api.anthropic.com`.
+
+Consultar as últimas falhas direto no banco:
+
+```sql
+SELECT criado_em, modelo, left(erro, 300)
+  FROM leituras_log WHERE erro IS NOT NULL
+ ORDER BY criado_em DESC LIMIT 10;
+```
 
 ## Divergências do CLAUDE.md, e por quê
 

@@ -102,6 +102,10 @@ func (s *Servico) Importar(ctx context.Context, arquivos []Arquivo, usuarioID *i
 	if err != nil {
 		return store.Importacao{}, err
 	}
+
+	s.log.Info("importação iniciada",
+		"importacao", impID, "arquivos", len(arquivos), "paginas", len(paginas),
+		"mes_referencia", s.MesReferencia, "concorrencia", s.Concorrencia)
 	imp := store.Importacao{ID: impID, Arquivos: nomes, TotalPaginas: len(paginas), Status: "concluida"}
 
 	// 2. Limite diário de custo: barra o lote antes de começar.
@@ -117,6 +121,9 @@ func (s *Servico) Importar(ctx context.Context, arquivos []Arquivo, usuarioID *i
 					"Ajuste LIMITE_LEITURAS_DIA ou importe amanhã.", s.LimiteDiario, usadas, len(paginas)),
 			}}
 			imp.Erros = 1
+			s.log.Error("importação barrada pelo limite diário de leituras",
+				"importacao", impID, "limite", s.LimiteDiario, "usadas_hoje", usadas,
+				"paginas_do_lote", len(paginas))
 			if err := s.store.FinalizarImportacao(ctx, imp); err != nil {
 				return imp, err
 			}
@@ -169,6 +176,15 @@ func (s *Servico) Importar(ctx context.Context, arquivos []Arquivo, usuarioID *i
 	if imp.Lidas == 0 && imp.Erros > 0 {
 		imp.Status = "falhou"
 	}
+
+	nivel := slog.LevelInfo
+	if imp.Erros > 0 {
+		nivel = slog.LevelError
+	}
+	s.log.Log(ctx, nivel, "importação concluída",
+		"importacao", impID, "status", imp.Status, "paginas", imp.TotalPaginas,
+		"lidas", imp.Lidas, "com_pendencia", imp.ComPendencia,
+		"duplicadas", imp.Duplicadas, "erros", imp.Erros)
 
 	if err := s.store.FinalizarImportacao(ctx, imp); err != nil {
 		return imp, err
@@ -240,6 +256,8 @@ func (s *Servico) processar(ctx context.Context, p pagina, impID int64,
 	d := store.DetalhePagina{Arquivo: p.arquivo, Pagina: p.numero}
 
 	if p.erro != nil {
+		s.log.Error("pagina nao pôde ser preparada para leitura",
+			"arquivo", p.arquivo, "pagina", p.numero, "erro", p.erro)
 		d.Situacao = "erro"
 		d.Erro = p.erro.Error()
 		return d
@@ -251,6 +269,8 @@ func (s *Servico) processar(ctx context.Context, p pagina, impID int64,
 		d.Erro = fmt.Sprintf("esta imagem já foi importada antes (foto %d)", foto.ID)
 		return d
 	} else if !ehNaoEncontrado(err) {
+		s.log.Error("falha ao conferir imagens já importadas",
+			"arquivo", p.arquivo, "pagina", p.numero, "erro", err)
 		d.Situacao = "erro"
 		d.Erro = fmt.Sprintf("falha ao conferir imagens já importadas: %v", err)
 		return d
@@ -261,6 +281,8 @@ func (s *Servico) processar(ctx context.Context, p pagina, impID int64,
 		Largura: p.img.Largura, Altura: p.img.Altura,
 	})
 	if err != nil {
+		s.log.Error("falha ao guardar a imagem do cupom",
+			"arquivo", p.arquivo, "pagina", p.numero, "erro", err)
 		d.Situacao = "erro"
 		d.Erro = fmt.Sprintf("falha ao guardar a imagem: %v", err)
 		return d
@@ -283,6 +305,12 @@ func (s *Servico) processar(ctx context.Context, p pagina, impID int64,
 	}
 
 	if errLeitura != nil {
+		// Antes isto ia SÓ para leituras_log, no banco. Quem olha o log do
+		// contêiner não via nada, e uma importação que falhou inteira parecia
+		// não ter acontecido.
+		s.log.Error("falha ao ler cupom",
+			"arquivo", p.arquivo, "pagina", p.numero, "fonte", p.fonte,
+			"modelo", res.Modelo, "foto_id", foto.ID, "erro", errLeitura)
 		d.Situacao = "erro"
 		d.Erro = errLeitura.Error()
 		return d
@@ -295,6 +323,8 @@ func (s *Servico) processar(ctx context.Context, p pagina, impID int64,
 
 	grav, err := s.store.SalvarCupom(ctx, cupom, &impID)
 	if err != nil {
+		s.log.Error("falha ao gravar o cupom lido",
+			"arquivo", p.arquivo, "pagina", p.numero, "numero", cupom.Numero, "erro", err)
 		d.Situacao = "erro"
 		d.Erro = fmt.Sprintf("falha ao gravar o cupom: %v", err)
 		return d
