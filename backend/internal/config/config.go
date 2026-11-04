@@ -33,7 +33,20 @@ type Config struct {
 	AdminEmail    string
 	AdminSenha    string
 
-	// Leitura via Claude
+	// Leitura por visão
+	//
+	// Provedor escolhe quem lê os cupons: "anthropic" (padrão) ou "openai".
+	// Os dois não compartilham formato de API — a OpenAI usa
+	// chat/completions com image_url, a Anthropic usa messages com bloco de
+	// imagem — então cada um tem seu cliente.
+	Provedor string
+
+	OpenAIAPIKey  string
+	OpenAIBaseURL string
+	OpenAIModelo  string
+	// LeituraEstruturada liga a saída por schema no provedor OpenAI.
+	LeituraEstruturada bool
+
 	AnthropicAPIKey string
 	// AnthropicBaseURL permite apontar para um gateway compatível com a API
 	// Messages (OmniRoute, OpenRouter em modo Anthropic, proxy corporativo).
@@ -69,6 +82,10 @@ func Carregar() (Config, error) {
 		SessaoDuracao:     time.Duration(numero("SESSAO_HORAS", 12)) * time.Hour,
 		AdminEmail:        texto("ADMIN_EMAIL", ""),
 		AdminSenha:        os.Getenv("ADMIN_SENHA"),
+		Provedor:          strings.ToLower(texto("LEITURA_PROVEDOR", "")),
+		OpenAIAPIKey:      os.Getenv("OPENAI_API_KEY"),
+		OpenAIBaseURL:     texto("OPENAI_BASE_URL", ""),
+		OpenAIModelo:      texto("OPENAI_MODEL", "gpt-4o"),
 		AnthropicAPIKey:   os.Getenv("ANTHROPIC_API_KEY"),
 		AnthropicBaseURL:  texto("ANTHROPIC_BASE_URL", ""),
 		ClaudeModelo:      texto("CLAUDE_MODEL", "claude-opus-5"),
@@ -97,6 +114,20 @@ func Carregar() (Config, error) {
 	}
 
 	c.RecursosAnthropic = booleano("LEITURA_RECURSOS_ANTHROPIC", c.AnthropicBaseURL == "")
+	c.LeituraEstruturada = booleano("LEITURA_ESTRUTURADA", true)
+
+	// Sem LEITURA_PROVEDOR explícito, decide pela chave presente. Assim quem
+	// só põe OPENAI_API_KEY não precisa saber que existe um seletor.
+	if c.Provedor == "" {
+		switch {
+		case c.AnthropicAPIKey != "":
+			c.Provedor = ProvedorAnthropic
+		case c.OpenAIAPIKey != "":
+			c.Provedor = ProvedorOpenAI
+		default:
+			c.Provedor = ProvedorAnthropic
+		}
+	}
 
 	origens := texto("CORS_ORIGENS", "")
 	for _, o := range strings.Split(origens, ",") {
@@ -112,13 +143,32 @@ func Carregar() (Config, error) {
 	return c, nil
 }
 
+// Provedores de leitura suportados.
+const (
+	ProvedorAnthropic = "anthropic"
+	ProvedorOpenAI    = "openai"
+)
+
 // Producao informa se a API está rodando em produção.
 func (c Config) Producao() bool { return c.Ambiente == "producao" }
 
-// LeituraHabilitada informa se há credencial para chamar a API do Claude.
+// LeituraHabilitada informa se há credencial para o provedor escolhido.
 // Sem ela o sistema sobe normalmente: cadastros, revisão manual, cobrança e
 // Excel continuam funcionando, só a leitura automática fica indisponível.
-func (c Config) LeituraHabilitada() bool { return c.AnthropicAPIKey != "" }
+func (c Config) LeituraHabilitada() bool {
+	if c.Provedor == ProvedorOpenAI {
+		return c.OpenAIAPIKey != ""
+	}
+	return c.AnthropicAPIKey != ""
+}
+
+// ModeloDeLeitura devolve o modelo em uso, qualquer que seja o provedor.
+func (c Config) ModeloDeLeitura() string {
+	if c.Provedor == ProvedorOpenAI {
+		return c.OpenAIModelo
+	}
+	return c.ClaudeModelo
+}
 
 // validar confere a configuração inteira e devolve TODOS os problemas de uma
 // vez, numerados.
@@ -151,6 +201,12 @@ func (c Config) validar() error {
 		problemas = append(problemas, fmt.Sprintf(
 			"JWT_SECRET tem %d caracteres e precisa de no mínimo %d. Gere com: openssl rand -hex 64",
 			len(c.JWTSecret), MinimoJWTSecret))
+	}
+
+	if c.Provedor != ProvedorAnthropic && c.Provedor != ProvedorOpenAI {
+		problemas = append(problemas, fmt.Sprintf(
+			"LEITURA_PROVEDOR=%q não é reconhecido; use %q ou %q",
+			c.Provedor, ProvedorAnthropic, ProvedorOpenAI))
 	}
 
 	if c.Producao() && len(c.OrigensCORS) == 0 {

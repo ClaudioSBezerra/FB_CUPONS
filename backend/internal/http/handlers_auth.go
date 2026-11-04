@@ -69,7 +69,8 @@ func (s *Servidor) me(w http.ResponseWriter, r *http.Request) {
 	escreverJSON(w, http.StatusOK, map[string]any{
 		"usuario":            u,
 		"leitura_habilitada": s.cfg.LeituraHabilitada(),
-		"modelo":             s.cfg.ClaudeModelo,
+		"provedor":           s.cfg.Provedor,
+		"modelo":             s.cfg.ModeloDeLeitura(),
 		"modelo_forte":       s.cfg.ClaudeModeloForte,
 	})
 }

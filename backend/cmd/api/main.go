@@ -32,6 +32,52 @@ func main() {
 	}
 }
 
+// montarLeitor escolhe o cliente de leitura conforme o provedor configurado.
+//
+// Os dois provedores não compartilham formato de API, então cada um tem seu
+// cliente; a interface leitura.Leitor é o que permite trocar sem o resto do
+// sistema saber.
+func montarLeitor(cfg config.Config, log *slog.Logger) leitura.Leitor {
+	if cfg.Provedor == config.ProvedorOpenAI {
+		cliente := leitura.NovoClienteOpenAI(leitura.OpcoesOpenAI{
+			APIKey:      cfg.OpenAIAPIKey,
+			BaseURL:     cfg.OpenAIBaseURL,
+			Modelo:      cfg.OpenAIModelo,
+			Timeout:     cfg.ClaudeTimeout,
+			Estruturado: cfg.LeituraEstruturada,
+		})
+		log.Info("leitura por visão habilitada",
+			"provedor", "openai", "endereco", cliente.BaseURL(),
+			"modelo", cliente.Modelo(), "estruturada", cfg.LeituraEstruturada,
+			"concorrencia", cfg.Concorrencia)
+		log.Warn("confira que o modelo escolhido ENXERGA imagem. Um modelo só de texto " +
+			"não falha de forma óbvia: responde como se não houvesse foto, e a " +
+			"cobrança sai inventada")
+		return cliente
+	}
+
+	cliente := leitura.NovoClienteClaude(leitura.Opcoes{
+		APIKey:            cfg.AnthropicAPIKey,
+		BaseURL:           cfg.AnthropicBaseURL,
+		Modelo:            cfg.ClaudeModelo,
+		Esforco:           cfg.ClaudeEsforco,
+		Timeout:           cfg.ClaudeTimeout,
+		RecursosAnthropic: cfg.RecursosAnthropic,
+	})
+	log.Info("leitura por visão habilitada",
+		"provedor", "anthropic", "endereco", cliente.BaseURL(),
+		"modelo", cfg.ClaudeModelo, "modelo_forte", cfg.ClaudeModeloForte,
+		"recursos_anthropic", cliente.RecursosAnthropic(),
+		"esforco", cfg.ClaudeEsforco, "concorrencia", cfg.Concorrencia)
+	if !cliente.RecursosAnthropic() {
+		log.Warn("recursos exclusivos da Anthropic desligados: sem cache de prompt, " +
+			"sem raciocínio adaptativo e sem saída estruturada por schema. " +
+			"O JSON passa a depender da instrução do prompt. " +
+			"Ligue com LEITURA_RECURSOS_ANTHROPIC=1 se o backend os suportar")
+	}
+	return cliente
+}
+
 // garantirAdmin cria o usuário administrador inicial quando o banco ainda não
 // tem nenhum usuário. Problemas aqui são avisados, não fatais.
 func garantirAdmin(ctx context.Context, cfg config.Config, st *store.Store, log *slog.Logger) {
@@ -118,31 +164,15 @@ func executar(log *slog.Logger) error {
 	//    automática — revisão manual, cobrança e Excel continuam valendo.
 	var leitor leitura.Leitor
 	if cfg.LeituraHabilitada() {
-		cliente := leitura.NovoClienteClaude(leitura.Opcoes{
-			APIKey:            cfg.AnthropicAPIKey,
-			BaseURL:           cfg.AnthropicBaseURL,
-			Modelo:            cfg.ClaudeModelo,
-			Esforco:           cfg.ClaudeEsforco,
-			Timeout:           cfg.ClaudeTimeout,
-			RecursosAnthropic: cfg.RecursosAnthropic,
-		})
-		leitor = cliente
-		// O endereço entra no log de propósito: foi a informação que faltou
-		// quando uma chave de gateway foi usada contra api.anthropic.com.
-		log.Info("leitura por visão habilitada",
-			"endereco", cliente.BaseURL(),
-			"modelo", cfg.ClaudeModelo, "modelo_forte", cfg.ClaudeModeloForte,
-			"recursos_anthropic", cliente.RecursosAnthropic(),
-			"esforco", cfg.ClaudeEsforco, "concorrencia", cfg.Concorrencia)
-		if !cliente.RecursosAnthropic() {
-			log.Warn("recursos exclusivos da Anthropic desligados: sem cache de prompt, " +
-				"sem raciocínio adaptativo e sem saída estruturada por schema. " +
-				"O JSON passa a depender da instrução do prompt. " +
-				"Ligue com LEITURA_RECURSOS_ANTHROPIC=1 se o backend os suportar")
-		}
+		leitor = montarLeitor(cfg, log)
 	} else {
 		leitor = leitura.NovoLeitorGravado()
-		log.Warn("ANTHROPIC_API_KEY não definida: a importação por PDF está indisponível")
+		faltando := "ANTHROPIC_API_KEY"
+		if cfg.Provedor == config.ProvedorOpenAI {
+			faltando = "OPENAI_API_KEY"
+		}
+		log.Warn("leitura por visão indisponível: a importação por PDF está desligada",
+			"provedor", cfg.Provedor, "variavel_faltando", faltando)
 	}
 
 	importador := importacao.NovoServico(st, leitor, log)

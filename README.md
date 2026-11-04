@@ -303,9 +303,16 @@ A leitura fala a API Messages, então qualquer backend compatível serve — mas
 
 | Provedor | Configuração | Visão |
 |---|---|---|
-| Anthropic | `ANTHROPIC_BASE_URL` vazio, `CLAUDE_MODEL=claude-opus-5` | sim |
-| DeepSeek | `ANTHROPIC_BASE_URL=https://api.deepseek.com/anthropic`, `CLAUDE_MODEL=deepseek-flash` | sim, em `deepseek-flash`; `deepseek-v4-pro` **não** |
+| Anthropic | padrão; `CLAUDE_MODEL=claude-opus-5` | sim |
+| OpenAI | `LEITURA_PROVEDOR=openai`, `OPENAI_API_KEY`, `OPENAI_MODEL` | depende do modelo — confira na sua conta |
+| DeepSeek | `ANTHROPIC_BASE_URL=https://api.deepseek.com/anthropic`, `CLAUDE_MODEL=deepseek-flash` | sim em `deepseek-flash`; `deepseek-v4-pro` **não** |
 | OmniRoute (`combo_omniroute`) | — | **não** — responde `no vision-capable provider connected` |
+
+A OpenAI tem **cliente próprio** (`internal/leitura/openai.go`), não é questão
+de trocar o endereço: ela usa `chat/completions` com a imagem em `image_url`
+como data URL e saída estruturada em `response_format`, enquanto a Anthropic
+usa `messages` com bloco de imagem. A interface `leitura.Leitor` é o que
+permite trocar sem o resto do sistema saber.
 
 Fora de `api.anthropic.com`, os recursos exclusivos (cache de prompt,
 raciocínio adaptativo, saída estruturada por schema) são **desligados

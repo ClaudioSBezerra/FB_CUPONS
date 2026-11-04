@@ -68,6 +68,15 @@ services:
       CORS_ORIGENS: ${DOMINIO_URL:-https://cupom.fbtax.cloud}
       UPLOAD_MAX_MB: ${UPLOAD_MAX_MB:-50}
 
+      # --- Provedor da leitura -------------------------------------------
+      # "anthropic" (padrão) ou "openai". Vazio decide pela chave presente.
+      LEITURA_PROVEDOR: ${LEITURA_PROVEDOR-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o}
+      # Saída estruturada por schema no provedor OpenAI. Desligue se o
+      # endereço for um gateway que não suporte json_schema.
+      LEITURA_ESTRUTURADA: ${LEITURA_ESTRUTURADA-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:?defina ANTHROPIC_API_KEY no .env}
       # Endereço da API. Vazio = api.anthropic.com. Preencha se a chave for
       # de um gateway compatível com a API Messages (OmniRoute, proxy).

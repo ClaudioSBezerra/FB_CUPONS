@@ -54,6 +54,29 @@ DOMINIO_URL=https://cupom.fbtax.cloud
 ADMIN_EMAIL=claudiosousadebezerra@gmail.com
 ADMIN_SENHA=SUBSTITUIR_minimo_8_caracteres
 
+# ── Provedor da leitura ───────────────────────────────────
+# "anthropic" (padrão) ou "openai". Vazio decide pela chave presente.
+# Os dois NÃO compartilham formato de API, então cada um tem seu cliente.
+LEITURA_PROVEDOR=
+
+# --- Opção OpenAI ---
+# O modelo PRECISA enxergar imagem. Confira na página de modelos da sua
+# conta: um modelo só de texto não falha de forma óbvia — ele responde como
+# se não houvesse foto, e a cobrança sai inventada.
+#
+#   LEITURA_PROVEDOR=openai
+#   OPENAI_API_KEY=sk-proj-...
+#   OPENAI_MODEL=gpt-4o
+#
+# OPENAI_BASE_URL só para gateway; vazio usa https://api.openai.com/v1.
+OPENAI_API_KEY=
+OPENAI_BASE_URL=
+OPENAI_MODEL=gpt-4o
+
+# Saída estruturada por schema (response_format json_schema, strict).
+# Desligue (0) se o endereço for um gateway que não suporte.
+LEITURA_ESTRUTURADA=
+
 # ── Leitura dos cupons via Claude (visão) ─────────────────
 # OPCIONAL. Sem a chave o sistema sobe e funciona, menos a aba Importar:
 # cadastros, revisão manual, cobrança e Excel seguem valendo.

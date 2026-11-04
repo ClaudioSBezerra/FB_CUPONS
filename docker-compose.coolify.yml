@@ -99,6 +99,15 @@ services:
       # importação automática por PDF — cadastros, revisão manual, cobrança e
       # Excel seguem valendo, e a aba Importar aparece desativada com o motivo.
       # Preencher depois no painel e redeployar habilita a leitura.
+      # --- Provedor da leitura -------------------------------------------
+      # "anthropic" (padrão) ou "openai". Vazio decide pela chave presente.
+      LEITURA_PROVEDOR: ${LEITURA_PROVEDOR-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o}
+      # Saída estruturada por schema no provedor OpenAI. Desligue se o
+      # endereço for um gateway que não suporte json_schema.
+      LEITURA_ESTRUTURADA: ${LEITURA_ESTRUTURADA-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY-}
       # Endereço da API. Vazio = api.anthropic.com. Preencha se a chave for
       # de um gateway compatível com a API Messages (OmniRoute, proxy).
